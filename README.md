@@ -66,8 +66,10 @@ picks, then earliest submission. All weights are editable in `CONFIG.scoring`.
 - **Shared leaderboard:** a free **Firebase Realtime Database** (config in
   `CONFIG.firebase`). Everyone who opens a link shares one live board.
 - **Multiple pools:** add `?g=<name>` to the URL for a separate, isolated
-  leaderboard — e.g. `…/?g=family` or `…/?g=friends2`. No setup; just share
-  the link. Entries live under `entries/<name>` in the same database.
+  leaderboard — e.g. the friends pool `…/?g=ribos`, `…/?g=family`, or
+  `…/?g=friends2`. No setup; just share the link. The default (`ribos`)
+  reuses the original `entries/main` node; other pools live under
+  `entries/<name>` in the same database.
 - **Lock:** entries lock at the time set in `CONFIG.lockISO`. After that,
   everything is read-only and auto-scored.
 
