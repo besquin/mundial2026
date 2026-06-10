@@ -118,13 +118,56 @@
   .hide{display:none !important}
   @media(max-width:640px){ .grid2{grid-template-columns:1fr} }
   @media(max-width:560px){ .match{grid-template-columns:1fr} select{width:100%} .title{font-size:24px} }
+
+  /* ---------------- visual polish ---------------- */
+  body{background:
+    radial-gradient(1100px 520px at 50% -8%,#1b2b5e 0,transparent 60%),
+    radial-gradient(820px 560px at 100% 0,rgba(34,197,94,.10),transparent 55%),
+    radial-gradient(820px 560px at 0 10%,rgba(59,130,246,.08),transparent 55%),
+    linear-gradient(180deg,#0b1020,#080b16);}
+  .wrap::before{content:"";position:fixed;top:0;left:0;right:0;height:3px;z-index:20;background:linear-gradient(90deg,var(--acc),var(--gold),var(--blue))}
+  .title{font-size:34px}
+  .title .tg{background:linear-gradient(90deg,#ffffff,#bbf7d0 45%,#fbbf24);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .title .ball{-webkit-text-fill-color:initial}
+  .hosts{margin:8px 0 2px;color:var(--mut);font-size:14px;letter-spacing:.3px}
+  .hosts b{color:var(--txt)}
+  .pill{background:rgba(22,31,61,.7);backdrop-filter:blur(8px)}
+  .card{transition:border-color .2s,box-shadow .2s}
+  .card:hover{border-color:#33457a}
+  .card>h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tab.active{box-shadow:0 6px 16px rgba(34,197,94,.35)}
+  .btn{box-shadow:0 6px 16px rgba(34,197,94,.25)} .btn.ghost{box-shadow:none}
+  .progress>i{box-shadow:0 0 12px rgba(34,197,94,.55)}
+  .stat{transition:transform .1s,border-color .2s}
+  .stat:hover{border-color:#33457a;transform:translateY(-1px)}
+  .chip{transition:transform .08s,background .15s,border-color .15s}
+  .chip:active{transform:scale(.96)} .chip.on{box-shadow:0 4px 12px rgba(251,191,36,.32)}
+  .group{transition:border-color .2s} .group:hover{border-color:#33457a}
+  .res-chip.hit{background:rgba(34,197,94,.14)} .res-chip.miss{background:rgba(239,68,68,.12)}
+  /* leaderboard */
+  table.lb tbody tr{transition:background .15s} table.lb tbody tr:hover{background:rgba(255,255,255,.03)}
+  table.lb tbody tr:first-child{background:linear-gradient(90deg,rgba(251,191,36,.12),transparent)}
+  table.lb tbody tr:first-child .total{font-size:16px}
+  /* bracket */
+  #bracketWrap{position:relative}
+  #bracketWrap::after{content:"";position:absolute;top:0;right:0;bottom:14px;width:34px;pointer-events:none;background:linear-gradient(90deg,transparent,var(--card));border-radius:0 12px 12px 0}
+  .bracket{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#33457a transparent}
+  .bracket::-webkit-scrollbar{height:8px}.bracket::-webkit-scrollbar-thumb{background:#33457a;border-radius:8px}
+  .bcol{scroll-snap-align:start}
+  .bcol h4{position:sticky;top:0;background:var(--card2);padding:5px 0;border-radius:8px;z-index:1}
+  .bmatch{box-shadow:0 4px 12px rgba(0,0,0,.28)}
+  .champ:not(.empty){box-shadow:0 8px 22px rgba(251,191,36,.4)}
+  .scrollhint{display:none}
+  @media(max-width:760px){.scrollhint{display:block;text-align:center;color:var(--mut);font-size:12px;margin:2px 0 8px}}
+  @media(max-width:560px){.gin{width:54px;padding:10px 6px;font-size:16px}.bgin{width:46px;padding:8px 4px;font-size:15px}.title{font-size:26px}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <h1 class="title">⚽ World Cup 2026 Pick'em</h1>
-    <p class="subtitle">Predict group standings, wild cards & the full knockout bracket — auto-scored, live.</p>
+    <h1 class="title"><span class="ball">⚽</span> <span class="tg">World Cup 2026 Pick'em</span></h1>
+    <p class="subtitle">Predict group standings, wild cards &amp; the full knockout bracket — auto-scored, live.</p>
+    <div class="hosts">🇨🇦 Canada · 🇲🇽 Mexico · 🇺🇸 USA · <b>2026</b></div>
     <div class="statusbar">
       <span class="pill"><span id="liveDot" class="live-dot off"></span><span id="liveText">Connecting…</span></span>
       <span class="pill">🔒 Picks lock in <span id="clock" class="clock">—</span></span>
@@ -195,6 +238,7 @@
       <h2>3️⃣ Knockout bracket</h2>
       <p class="muted" id="bracketNote">Seeded from your group 1st/2nd and your 8 wild cards. Click the team you think wins each tie, all the way to the champion. Points rise every round.</p>
       <div class="btnrow" style="margin:8px 0"><button class="btn ghost sm" id="autoBracket">⚡ Auto-fill (favour higher seeds)</button><button class="btn ghost sm" id="clearBracket">↺ Clear bracket</button></div>
+      <div class="scrollhint">← swipe to see every round →</div>
       <div id="bracketWrap"><div class="bracket" id="bracket"></div></div>
     </div>
 
