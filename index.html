@@ -190,6 +190,7 @@
     <p class="subtitle">Predict group standings, wild cards &amp; the full knockout bracket — auto-scored, live.</p>
     <div class="hosts">🇨🇦 Canada · 🇲🇽 Mexico · 🇺🇸 USA · <b>2026</b></div>
     <div class="statusbar">
+      <span class="pill" id="poolPill">🏷️ —</span>
       <span class="pill"><span id="liveDot" class="live-dot off"></span><span id="liveText">Connecting…</span></span>
       <span class="pill">🔒 Picks lock in <span id="clock" class="clock">—</span></span>
       <span class="pill">👥 <span id="entryCount">0</span> players</span>
@@ -404,9 +405,12 @@ Object.assign(NAMEMAP,{southkorea:"KOR",korearepublic:"KOR",korea:"KOR",unitedst
 const codeOf=name=>NAMEMAP[norm(name)]||null;
 
 /* =========================== STATE =========================== */
+/* Separate pools for different friend groups: ?g=family, ?g=friends2, etc. (default 'main') */
+const GROUPKEY=((new URLSearchParams(location.search).get('g')||'main').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,32))||'main';
+const GROUPLABEL=GROUPKEY.charAt(0).toUpperCase()+GROUPKEY.slice(1);
 const state={
   picks:{}, scores:{}, groupPicks:{}, groupManual:{}, wildcards:[], koScores:{}, koPens:{}, bracket:{},
-  myId:localStorage.getItem('wc_my_id')||null,
+  myId:localStorage.getItem('wc_my_id_'+GROUPKEY)||null,
   entries:{},
   results:{matches:{},scores:{}},
   standings:{},
@@ -432,18 +436,18 @@ const Store=(()=>{
   function startPoll(){const tick=async()=>{try{const d=await poolGet();poolError=false;emit(d.entries||{});}catch(e){poolError=true;}};tick();setInterval(tick,CONFIG.entriesPollMs);}
   async function createPool(){const r=await fetch(JB,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({entries:{},createdAt:Date.now()})});if(!r.ok)throw new Error('create '+r.status);let id=r.headers.get('X-jsonblob');if(!id){const loc=r.headers.get('Location');if(loc)id=loc.split('/').pop();}if(!id)throw new Error('no id');poolId=id;mode='pool';poolError=false;localStorage.setItem('wc_pool',id);setHash(id);startPoll();return id;}
   async function init(){
-    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,'entries'),s=>emit(s.val()||{}));mode='cloud';return mode;}catch(e){console.warn(e);}}
+    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,'entries/'+GROUPKEY),s=>emit(s.val()||{}));mode='cloud';return mode;}catch(e){console.warn(e);}}
     poolId=poolFromUrl()||localStorage.getItem('wc_pool')||null;
     if(poolId){mode='pool';localStorage.setItem('wc_pool',poolId);setHash(poolId);startPoll();return mode;}
     mode='local';const fire=()=>emit(localLoad());window.addEventListener('storage',fire);if(bc)bc.onmessage=fire;setTimeout(fire,0);return mode;
   }
   async function saveEntry(id,entry){
-    if(mode==='cloud'){await fns.set(fns.ref(db,'entries/'+id),entry);return;}
+    if(mode==='cloud'){await fns.set(fns.ref(db,'entries/'+GROUPKEY+'/'+id),entry);return;}
     if(mode==='local'){try{await createPool();}catch(e){poolError=true;}}
     if(mode==='pool'){let d;try{d=await poolGet();}catch(e){d={entries:{}};}d.entries=d.entries||{};d.entries[id]=entry;await poolPut(d);emit(d.entries);return;}
     const l=localLoad();l[id]=entry;localStorage.setItem(LK,JSON.stringify(l));emit(l);if(bc)bc.postMessage('x');
   }
-  return{init,saveEntry,onEntries:fn=>listeners.push(fn),get mode(){return mode;},get poolId(){return poolId;},get poolError(){return poolError;},get shareUrl(){return mode==='cloud'?(location.origin+location.pathname):(poolId?(location.origin+location.pathname+'#pool='+poolId):null);}};
+  return{init,saveEntry,onEntries:fn=>listeners.push(fn),get mode(){return mode;},get poolId(){return poolId;},get poolError(){return poolError;},get shareUrl(){return mode==='cloud'?(location.origin+location.pathname+(GROUPKEY!=='main'?('?g='+GROUPKEY):'')):(poolId?(location.origin+location.pathname+'#pool='+poolId):null);}};
 })();
 
 /* =========================== HELPERS =========================== */
@@ -802,7 +806,7 @@ function dec(code){return JSON.parse(decodeURIComponent(escape(atob(code.trim())
 $('#submitBtn').onclick=async()=>{
   if(isLocked())return;const name=$('#playerName').value.trim();if(!name)return;
   if(Object.keys(state.scores).length!==MATCHES.length||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
-  if(!state.myId){state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);localStorage.setItem('wc_my_id',state.myId);}
+  if(!state.myId){state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);localStorage.setItem('wc_my_id_'+GROUPKEY,state.myId);}
   const existing=state.entries[state.myId];
   recomputeQualifiers();recomputeBracket();
   const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,koPens:state.koPens,bracket:state.bracket,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
@@ -812,8 +816,8 @@ $('#submitBtn').onclick=async()=>{
 };
 $('#copyShare').onclick=async()=>{try{await navigator.clipboard.writeText(Store.shareUrl||'');toast($('#copyShare'),'Copied!');}catch{const i=$('#shareUrl');i.select();document.execCommand&&document.execCommand('copy');toast($('#copyShare'),'Copied!');}};
 
-function saveDraft(){localStorage.setItem('wc_draft',JSON.stringify({name:$('#playerName').value,scores:state.scores,wildcards:state.wildcards,koScores:state.koScores,koPens:state.koPens}));refreshSummary();}
-function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft')||'null');if(d){if(d.name)$('#playerName').value=d.name;state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};state.koPens=d.koPens||{};}}catch{}}
+function saveDraft(){localStorage.setItem('wc_draft_'+GROUPKEY,JSON.stringify({name:$('#playerName').value,scores:state.scores,wildcards:state.wildcards,koScores:state.koScores,koPens:state.koPens}));refreshSummary();}
+function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft_'+GROUPKEY)||'null');if(d){if(d.name)$('#playerName').value=d.name;state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};state.koPens=d.koPens||{};}}catch{}}
 function toast(btn,msg){const o=btn.textContent;btn.textContent=msg;setTimeout(()=>btn.textContent=o,1200);}
 
 /* =========================== COUNTDOWN =========================== */
@@ -836,6 +840,8 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
 /* =========================== INIT =========================== */
 (async function init(){
   renderPrizes();renderScoreRules();
+  $('#poolPill').textContent='🏷️ '+(GROUPKEY==='main'?'Main pool':GROUPLABEL+' pool');
+  document.title='WC 2026 Pick\'em'+(GROUPKEY!=='main'?(' — '+GROUPLABEL):'');
   buildGroups();
   loadDraft();recomputeQualifiers();applyAll();
   Store.onEntries(d=>{state.entries=d||{};renderBoard();});
