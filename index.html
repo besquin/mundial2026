@@ -408,11 +408,13 @@ const codeOf=name=>NAMEMAP[norm(name)]||null;
 /* Separate pools for different friend groups: ?g=ribos (friends, default), ?g=family, ?g=friends2, … */
 const RAWG=((new URLSearchParams(location.search).get('g')||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,32));
 const GROUPKEY=RAWG||'ribos';                                              // default friends pool = "ribos"
-const STOREKEY=(GROUPKEY==='ribos'||GROUPKEY==='main')?'main':GROUPKEY;    // ribos reuses the original node so existing entries carry over
-const GROUPLABEL=(GROUPKEY==='ribos'||GROUPKEY==='main')?'Ribos':(GROUPKEY.charAt(0).toUpperCase()+GROUPKEY.slice(1));
+const ISDEFAULT=(GROUPKEY==='ribos'||GROUPKEY==='main');
+const STOREKEY=ISDEFAULT?'main':GROUPKEY;                                   // local-storage namespace
+const DBPATH=ISDEFAULT?'entries':('pools/'+GROUPKEY);                       // ribos = existing root 'entries'; others under 'pools/<g>'
+const GROUPLABEL=ISDEFAULT?'Ribos':(GROUPKEY.charAt(0).toUpperCase()+GROUPKEY.slice(1));
 const state={
   picks:{}, scores:{}, groupPicks:{}, groupManual:{}, wildcards:[], koScores:{}, koPens:{}, bracket:{},
-  myId:localStorage.getItem('wc_my_id_'+STOREKEY)||null,
+  myId:localStorage.getItem('wc_my_id_'+STOREKEY)||(ISDEFAULT?localStorage.getItem('wc_my_id'):null)||null,
   entries:{},
   results:{matches:{},scores:{}},
   standings:{},
@@ -438,13 +440,13 @@ const Store=(()=>{
   function startPoll(){const tick=async()=>{try{const d=await poolGet();poolError=false;emit(d.entries||{});}catch(e){poolError=true;}};tick();setInterval(tick,CONFIG.entriesPollMs);}
   async function createPool(){const r=await fetch(JB,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({entries:{},createdAt:Date.now()})});if(!r.ok)throw new Error('create '+r.status);let id=r.headers.get('X-jsonblob');if(!id){const loc=r.headers.get('Location');if(loc)id=loc.split('/').pop();}if(!id)throw new Error('no id');poolId=id;mode='pool';poolError=false;localStorage.setItem('wc_pool',id);setHash(id);startPoll();return id;}
   async function init(){
-    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,'entries/'+STOREKEY),s=>emit(s.val()||{}));mode='cloud';return mode;}catch(e){console.warn(e);}}
+    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,DBPATH),s=>emit(s.val()||{}));mode='cloud';return mode;}catch(e){console.warn(e);}}
     poolId=poolFromUrl()||localStorage.getItem('wc_pool')||null;
     if(poolId){mode='pool';localStorage.setItem('wc_pool',poolId);setHash(poolId);startPoll();return mode;}
     mode='local';const fire=()=>emit(localLoad());window.addEventListener('storage',fire);if(bc)bc.onmessage=fire;setTimeout(fire,0);return mode;
   }
   async function saveEntry(id,entry){
-    if(mode==='cloud'){await fns.set(fns.ref(db,'entries/'+STOREKEY+'/'+id),entry);return;}
+    if(mode==='cloud'){await fns.set(fns.ref(db,DBPATH+'/'+id),entry);return;}
     if(mode==='local'){try{await createPool();}catch(e){poolError=true;}}
     if(mode==='pool'){let d;try{d=await poolGet();}catch(e){d={entries:{}};}d.entries=d.entries||{};d.entries[id]=entry;await poolPut(d);emit(d.entries);return;}
     const l=localLoad();l[id]=entry;localStorage.setItem(LK,JSON.stringify(l));emit(l);if(bc)bc.postMessage('x');
