@@ -54,8 +54,8 @@ picks, then earliest submission. All weights are editable in `CONFIG.scoring`.
 - **Shared leaderboard:** a no-signup JSON store keyed by a pool id in the URL
   (`#pool=…`). If the store is ever unreachable, the app falls back to
   **share-by-code** (Copy pick code / Import pick code) so it never breaks.
-- **Lock:** entries lock automatically **1 hour before the opening match**
-  (Mexico v South Africa). After that, everything is read-only and auto-scored.
+- **Lock:** entries lock at the time set in `CONFIG.lockISO`. After that,
+  everything is read-only and auto-scored.
 
 ## Publishing (one-time, ~10 seconds)
 GitHub Pages must be switched on once by the repo owner:
@@ -69,7 +69,7 @@ GitHub Pages must be switched on once by the repo owner:
 All settings live in the `CONFIG` block near the top of the `<script>` in
 [`index.html`](index.html):
 
-- `lockISO` — when entries lock (default: `2026-06-11T19:00:00-06:00`).
+- `lockISO` — when entries lock (currently `2026-06-10T23:00:00-07:00`).
 - `sportsdb` — the live-results feed (`leagueId`, `season`). If results don't
   appear once matches start, adjust the league id here.
 - `firebase` — optional. Paste a Firebase Realtime Database config to use
