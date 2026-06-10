@@ -169,6 +169,13 @@
   .bcol h4{position:sticky;top:0;background:var(--card2);padding:5px 0;border-radius:8px;z-index:1}
   .bmatch{box-shadow:0 4px 12px rgba(0,0,0,.28)}
   .champ:not(.empty){box-shadow:0 8px 22px rgba(251,191,36,.4)}
+  .finalcol h4{color:var(--gold);font-size:13px}
+  .finalcol .bmatch{outline:2px solid var(--gold);box-shadow:0 0 18px rgba(251,191,36,.4)}
+  .champbox{min-width:190px}
+  .champbox h4{color:var(--gold);font-size:13px}
+  .champ{font-size:18px;padding:16px 20px}
+  .bronzecol{border-left:1px dashed var(--line);padding-left:14px;margin-left:4px}
+  .bronzecol h4{color:#cd7f32}
   .scrollhint{display:none}
   @media(max-width:760px){.scrollhint{display:block;text-align:center;color:var(--mut);font-size:12px;margin:2px 0 8px}}
   @media(max-width:560px){.gin{width:54px;padding:10px 6px;font-size:16px}.bgin{width:46px;padding:8px 4px;font-size:15px}.title{font-size:26px}}
@@ -209,6 +216,7 @@
         </div>
         <div>
           <div class="muted" style="font-weight:700;color:var(--txt);margin-bottom:6px">🏆 Prizes (of the pot)</div>
+          <div id="entryFee" class="muted" style="margin-bottom:8px"></div>
           <div id="prizeList"></div>
         </div>
       </div>
@@ -317,6 +325,8 @@ const CONFIG = {
   pollMs: 60000, entriesPollMs: 15000,
   // Points per correct prediction (edit freely)
   scoring: { match:1, exactScore:2, first:2, second:1, wildcard:2, r16:2, qf:4, sf:8, finalist:12, champion:20, matchupBonus:3 },
+  // Entry buy-in (shown in Rules & Prizes)
+  entryFee: "$1,000 MXN",
   // Prizes (% of the pot)
   prizes: [
     { place:"🥇 1st place", prize:"60% of the pot" },
@@ -597,12 +607,12 @@ function renderBracket(){
         ? 'Enter the <b>score</b> of every tie — higher score advances (no draws). Later rounds open as you fill the earlier ones. Exact scores earn the bonus 🎯, and round points rise as you go.'
         : `🔒 Finish entering <b>all group scores</b> to unlock the bracket — <b>${left}</b> match${left===1?'':'es'} to go. It then seeds from your final 1st/2nd + wild cards.`);
   KO_ROUNDS.forEach(rd=>{
-    const col=el('div','bcol');col.appendChild(el('h4',null,rd.label));if(rd.pts)col.appendChild(el('div','pl','+'+rd.pts+'/team'));
+    const col=el('div','bcol'+(rd.key==='F'?' finalcol':''));col.appendChild(el('h4',null,rd.key==='F'?'🏆 Final':rd.label));if(rd.pts)col.appendChild(el('div','pl','+'+rd.pts+'/team'));
     rd.ids.forEach(id=>col.appendChild(koMatchBox(id,sm,actM,editable)));
     wrap.appendChild(col);
   });
-  const bcol=el('div','bcol');bcol.appendChild(el('h4',null,'3rd-place playoff'));bcol.appendChild(koMatchBox(BRONZEID,sm,actM,editable));const bw=state.bracket[BRONZEID];if(bw)bcol.appendChild(el('div','pl','🥉 '+fa(bw)));wrap.appendChild(bcol);
   const champ=state.bracket[FINID];const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));wrap.appendChild(cb);
+  const bcol=el('div','bcol bronzecol');bcol.appendChild(el('h4',null,'🥉 3rd-place playoff'));bcol.appendChild(koMatchBox(BRONZEID,sm,actM,editable));const bw=state.bracket[BRONZEID];if(bw)bcol.appendChild(el('div','pl','🥉 '+fa(bw)));wrap.appendChild(bcol);
   if(_afId){const e=document.getElementById(_afId);if(e)e.focus();}
   refreshSummary();
 }
@@ -807,7 +817,7 @@ function toast(btn,msg){const o=btn.textContent;btn.textContent=msg;setTimeout((
 function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){c.textContent='LOCKED';$('#lockBanner').classList.remove('hide');document.querySelectorAll('#groups input, #bracket input, #randomFill, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 
 /* =========================== RENDER static bits =========================== */
-function renderPrizes(){const e=$('#prizeList');if(!e)return;e.innerHTML=(CONFIG.prizes||[]).map(p=>`<div class="stat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;margin:0 0 8px"><b style="font-size:15px">${escapeHtml(p.place)}</b><span style="color:var(--txt)">${escapeHtml(p.prize)}</span></div>`).join('');}
+function renderPrizes(){const ef=$('#entryFee');if(ef)ef.innerHTML='💵 Entry buy-in: <b style="color:var(--txt)">'+escapeHtml(CONFIG.entryFee||'')+'</b> per player';const e=$('#prizeList');if(!e)return;e.innerHTML=(CONFIG.prizes||[]).map(p=>`<div class="stat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;margin:0 0 8px"><b style="font-size:15px">${escapeHtml(p.place)}</b><span style="color:var(--txt)">${escapeHtml(p.prize)}</span></div>`).join('');}
 function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<ul style="margin:0;padding-left:18px;line-height:1.7">
   <li><b>+${S.first}</b> correct group winner · <b>+${S.second}</b> correct runner-up (each group)</li>
   <li><b>+${S.wildcard}</b> each correct wild card (3rd-placed qualifier)</li>

@@ -54,6 +54,10 @@ reaches a round (progression), **plus** a bonus whenever a tie you predicted rea
 happens and you called the winner. Ties on the leaderboard break by total correct
 picks, then earliest submission. All weights are editable in `CONFIG.scoring`.
 
+## Entry & prizes
+- **Entry buy-in: $1,000 MXN per player.**
+- Pot split: **🥇 60% · 🥈 30% · 🥉 10%.**
+
 ## How it works (all free, no accounts)
 - **Hosting:** GitHub Pages (static site).
 - **Live results:** read directly from a public sports feed in the browser —
