@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>World Cup 2026 — Pick'em Pool ⚽</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <meta name="description" content="Predict every 2026 World Cup group-stage match and the 8 wild cards. Results are scored automatically and the leaderboard updates live." />
 <style>
   :root{
@@ -154,6 +155,10 @@
       <div class="btnrow">
         <input type="text" id="shareUrl" readonly style="flex:1;min-width:220px"/>
         <button class="btn sm" id="copyShare">📋 Copy link</button>
+      </div>
+      <div id="qrWrap" class="hide" style="margin-top:14px;text-align:center">
+        <img id="qrImg" alt="QR code for the pool invite link" style="width:184px;height:184px;background:#fff;border-radius:12px;padding:8px"/>
+        <p class="muted" style="margin:6px 0 0">📱 Friends can scan this to join the pool</p>
       </div>
     </div>
 
@@ -759,7 +764,15 @@ function setModeBanner(){
 function renderShare(){
   const url = Store.shareUrl;
   const card = $('#shareCard');
-  if (url){ $('#shareUrl').value = url; card.classList.remove('hide'); }
+  if (url){
+    $('#shareUrl').value = url; card.classList.remove('hide');
+    try{
+      if (window.qrcode){
+        const qr = qrcode(0,'M'); qr.addData(url); qr.make();
+        $('#qrImg').src = qr.createDataURL(5,8); $('#qrWrap').classList.remove('hide');
+      }
+    }catch(e){ $('#qrWrap').classList.add('hide'); }
+  }
   else card.classList.add('hide');
   if (Store.poolError){
     const b=$('#modeBanner'); b.className='banner warn';
