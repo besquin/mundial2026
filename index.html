@@ -414,7 +414,7 @@ const Store=(()=>{
     if(mode==='pool'){let d;try{d=await poolGet();}catch(e){d={entries:{}};}d.entries=d.entries||{};d.entries[id]=entry;await poolPut(d);emit(d.entries);return;}
     const l=localLoad();l[id]=entry;localStorage.setItem(LK,JSON.stringify(l));emit(l);if(bc)bc.postMessage('x');
   }
-  return{init,saveEntry,onEntries:fn=>listeners.push(fn),get mode(){return mode;},get poolId(){return poolId;},get poolError(){return poolError;},get shareUrl(){return poolId?(location.origin+location.pathname+'#pool='+poolId):null;}};
+  return{init,saveEntry,onEntries:fn=>listeners.push(fn),get mode(){return mode;},get poolId(){return poolId;},get poolError(){return poolError;},get shareUrl(){return mode==='cloud'?(location.origin+location.pathname):(poolId?(location.origin+location.pathname+'#pool='+poolId):null);}};
 })();
 
 /* =========================== HELPERS =========================== */
