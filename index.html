@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>World Cup 2026 — Pick'em Pool ⚽</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<meta name="description" content="Predict the 2026 World Cup: group standings, wild cards, and the full knockout bracket. Auto-scored, live leaderboard." />
+<title>World Cup 2026 — Pick'em Pool ⚽</title><meta name="description" content="Predict the 2026 World Cup: group standings, wild cards, and the full knockout bracket. Auto-scored, live leaderboard." />
 <style>
   :root{
     --bg:#0b1020; --bg2:#111935; --card:#161f3d; --card2:#1d2950;
@@ -232,10 +230,6 @@
       <h2>🔗 Your pool invite link</h2>
       <p class="muted">Send this to friends — everyone who opens it joins the <b>same live leaderboard</b>.</p>
       <div class="btnrow"><input type="text" id="shareUrl" readonly style="flex:1;min-width:220px"/><button class="btn sm" id="copyShare">📋 Copy link</button></div>
-      <div id="qrWrap" class="hide" style="margin-top:14px;text-align:center">
-        <img id="qrImg" alt="QR to invite link" style="width:184px;height:184px;background:#fff;border-radius:12px;padding:8px"/>
-        <p class="muted" style="margin:6px 0 0">📱 Friends can scan this to join</p>
-      </div>
     </div>
 
     <div class="card">
@@ -850,7 +844,7 @@ function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<
   <li>Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet & you pick the winner)</li>
   <li>Max <b>${maxPoints()}</b> pts · auto-scored from a live feed</li></ul>`;}
 function setModeBanner(){const dot=$('#liveDot'),txt=$('#liveText'),b=$('#modeBanner');if(Store.mode==='cloud'||Store.mode==='pool'){dot.classList.remove('off');txt.textContent='Live · shared';b.className='banner ok';b.innerHTML='🟢 <b>Live shared mode.</b> One leaderboard for everyone, auto-scored — no manual entry.';}else{dot.classList.add('off');txt.textContent='Ready';b.className='banner warn';b.innerHTML='👋 <b>Welcome!</b> Fill your picks and hit <b>Submit</b> — that creates a shared pool and an invite link for friends.';}renderShare();}
-function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(url){$('#shareUrl').value=url;card.classList.remove('hide');try{if(window.qrcode){const qr=qrcode(0,'M');qr.addData(url);qr.make();$('#qrImg').src=qr.createDataURL(5,8);$('#qrWrap').classList.remove('hide');}}catch(e){$('#qrWrap').classList.add('hide');}}else card.classList.add('hide');if(Store.poolError){const b=$('#modeBanner');b.className='banner warn';b.innerHTML='⚠️ Couldn\'t reach the shared store — picks saved on this device. Use <b>Copy my pick code</b> to share, or try again later.';}}
+function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(url){$('#shareUrl').value=url;card.classList.remove('hide');}else card.classList.add('hide');if(Store.poolError){const b=$('#modeBanner');b.className='banner warn';b.innerHTML='⚠️ Couldn\'t reach the shared store — picks saved on this device. Use <b>Copy my pick code</b> to share, or try again later.';}}
 
 /* =========================== INIT =========================== */
 (async function init(){
