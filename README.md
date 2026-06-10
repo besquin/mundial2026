@@ -39,8 +39,9 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 | **Exact scoreline** — on **every** match, group *and* knockout | **+2** bonus |
 | Team reaches **Round of 16 / QF / SF / Final** | **+2 / +4 / +8 / +12** each |
 | Correct **Champion** | **+20** |
+| Correct **🥉 3rd-place** winner | **+8** |
 | **Exact knockout tie** (both teams meet + you pick the winner) | **+3** bonus |
-| **Maximum** | **563** |
+| **Maximum** | **576** |
 
 Score entry is **mandatory** for all 72 group matches and all 32 knockout ties
 (Round of 32 → Final, plus the 3rd-place playoff).

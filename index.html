@@ -326,7 +326,7 @@ const CONFIG = {
   sportsdb: { key: "3", leagueId: "4429", season: "2026" },
   pollMs: 60000, entriesPollMs: 15000,
   // Points per correct prediction (edit freely)
-  scoring: { match:1, exactScore:2, first:2, second:1, wildcard:2, r16:2, qf:4, sf:8, finalist:12, champion:20, matchupBonus:3 },
+  scoring: { match:1, exactScore:2, first:2, second:1, wildcard:2, r16:2, qf:4, sf:8, finalist:12, champion:20, third:8, matchupBonus:3 },
   // Entry buy-in (shown in Rules & Prizes)
   entryFee: "$1,000 MXN",
   // Prizes (% of the pot)
@@ -495,6 +495,7 @@ function scoreEntry(e){
   let kC=0; const adv=bracketAdvancers(e);
   [['R16',S.r16],['QF',S.qf],['SF',S.sf],['F',S.finalist]].forEach(([rd,p])=>{const set=state.actual.ko[rd]||[];(adv[rd]||[]).forEach(c=>{if(set.includes(c)){pts+=p;kC++;}});});
   if(adv.champion&&state.actual.champion&&adv.champion===state.actual.champion){pts+=S.champion;kC++;}
+  const myThird=e.bracket&&e.bracket['B'];if(myThird&&state.actual.third&&myThird===state.actual.third){pts+=S.third;kC++;}
   // exact-tie bonus: a knockout match you predicted (both teams + the winner) actually happened
   let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.pair]=am.winner;});
   predictedTies(e).forEach(t=>{if(actM[t.pair]&&actM[t.pair]===t.winner){pts+=S.matchupBonus;bC++;}});
@@ -504,7 +505,7 @@ function scoreEntry(e){
   for(const m of KO){const a=koCodeFor(e,m.a,smE),b=koCodeFor(e,m.b,smE);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc||!Number.isFinite(sc.h)||!Number.isFinite(sc.a))continue;let h=sc.h,aa=sc.a;if(h===aa){const p=e.koPens&&e.koPens[m.id];if(p==='h')h++;else if(p==='a')aa++;else continue;}const ag=actG[[a,b].sort().join('|')];if(!ag)continue;if(ag[a]===h&&ag[b]===aa){pts+=S.exactScore;kxC++;}}
   return{total:pts,matchCorrect:mC,exactScores:eC+kxC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC,matchupHits:bC};
 }
-function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*(S.match+S.exactScore)+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion+KO.length*(S.matchupBonus+S.exactScore);}
+function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*(S.match+S.exactScore)+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion+S.third+KO.length*(S.matchupBonus+S.exactScore);}
 
 /* =========================== PICKS FORM =========================== */
 function buildGroups(){
@@ -614,7 +615,7 @@ function renderBracket(){
     wrap.appendChild(col);
   });
   const champ=state.bracket[FINID];const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));wrap.appendChild(cb);
-  const bcol=el('div','bcol bronzecol');bcol.appendChild(el('h4',null,'🥉 3rd-place playoff'));bcol.appendChild(koMatchBox(BRONZEID,sm,actM,editable));const bw=state.bracket[BRONZEID];if(bw)bcol.appendChild(el('div','pl','🥉 '+fa(bw)));wrap.appendChild(bcol);
+  const bcol=el('div','bcol bronzecol');bcol.appendChild(el('h4',null,'🥉 3rd-place playoff'));bcol.appendChild(el('div','pl','+'+CONFIG.scoring.third+' winner'));bcol.appendChild(koMatchBox(BRONZEID,sm,actM,editable));const bw=state.bracket[BRONZEID];if(bw)bcol.appendChild(el('div','pl','🥉 '+fa(bw)));wrap.appendChild(bcol);
   if(_afId){const e=document.getElementById(_afId);if(e)e.focus();}
   refreshSummary();
 }
@@ -826,6 +827,7 @@ function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<
   <li><b>+${S.match}</b> correct group-match result</li>
   <li><b>+${S.exactScore}</b> exact scoreline 🎯 — on <b>every</b> match (group & knockout)</li>
   <li>Knockouts (per team reaching the round): R16 <b>+${S.r16}</b> · QF <b>+${S.qf}</b> · SF <b>+${S.sf}</b> · Final <b>+${S.finalist}</b> · Champion <b>+${S.champion}</b></li>
+  <li>Correct <b>🥉 3rd-place</b> winner: <b>+${S.third}</b></li>
   <li>Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet & you pick the winner)</li>
   <li>Max <b>${maxPoints()}</b> pts · auto-scored from a live feed</li></ul>`;}
 function setModeBanner(){const dot=$('#liveDot'),txt=$('#liveText'),b=$('#modeBanner');if(Store.mode==='cloud'||Store.mode==='pool'){dot.classList.remove('off');txt.textContent='Live · shared';b.className='banner ok';b.innerHTML='🟢 <b>Live shared mode.</b> One leaderboard for everyone, auto-scored — no manual entry.';}else{dot.classList.add('off');txt.textContent='Ready';b.className='banner warn';b.innerHTML='👋 <b>Welcome!</b> Fill your picks and hit <b>Submit</b> — that creates a shared pool and an invite link for friends.';}renderShare();}
