@@ -5,10 +5,10 @@ Predict all **72 group-stage matches** and the **8 wild cards**, submit your
 entry, and watch the **live leaderboard** — results are pulled and scored
 **automatically**. No one ever types in a score.
 
-**Live app:** https://besquin.github.io/ribosmundial2026/
+**Live app:** https://besquin.github.io/mundial2026/
 
 <p align="center">
-  <img src="ribosmundial2026-qr.png" alt="QR code to the live app" width="240">
+  <img src="mundial2026-qr.png" alt="QR code to the live app" width="240">
   <br><em>Scan to open the app</em>
 </p>
 
@@ -63,9 +63,11 @@ picks, then earliest submission. All weights are editable in `CONFIG.scoring`.
 - **Hosting:** GitHub Pages (static site).
 - **Live results:** read directly from a public sports feed in the browser —
   no API key, no server.
-- **Shared leaderboard:** a no-signup JSON store keyed by a pool id in the URL
-  (`#pool=…`). If the store is ever unreachable, the app falls back to
-  **share-by-code** (Copy pick code / Import pick code) so it never breaks.
+- **Shared leaderboard:** a free **Firebase Realtime Database** (config in
+  `CONFIG.firebase`). Everyone who opens a link shares one live board.
+- **Multiple pools:** add `?g=<name>` to the URL for a separate, isolated
+  leaderboard — e.g. `…/?g=family` or `…/?g=friends2`. No setup; just share
+  the link. Entries live under `entries/<name>` in the same database.
 - **Lock:** entries lock at the time set in `CONFIG.lockISO`. After that,
   everything is read-only and auto-scored.
 
@@ -75,7 +77,7 @@ GitHub Pages must be switched on once by the repo owner:
 1. Go to **Settings → Pages**.
 2. **Build and deployment → Source:** *Deploy from a branch.*
 3. **Branch:** `claude/charming-goodall-mjos84`, **folder:** `/ (root)` → **Save.**
-4. Wait ~1 minute → live at https://besquin.github.io/ribosmundial2026/
+4. Wait ~1 minute → live at https://besquin.github.io/mundial2026/
 
 ## Configuration
 All settings live in the `CONFIG` block near the top of the `<script>` in
