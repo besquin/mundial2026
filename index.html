@@ -73,6 +73,12 @@
   .penbtn:hover{border-color:var(--mut)}
   .penbtn.on{background:var(--gold);color:#241300;border-color:transparent;font-weight:700}
   .pens.muted{color:var(--mut);font-size:12px}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modalbox{background:var(--card);border:1px solid var(--line);border-radius:16px;max-width:560px;width:100%;max-height:86vh;overflow:auto;padding:20px;position:relative;box-shadow:var(--shadow)}
+  .modalx{position:absolute;top:10px;right:12px;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:8px;cursor:pointer;padding:4px 10px;font-size:14px}
+  .modalbox h3{margin:0 26px 10px 0;font-size:18px}
+  .modalbox h4{margin:14px 0 4px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .modalbox p{margin:4px 0;font-size:14px}
   .pred{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
   .pred .lbl{font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .mini{width:100%;font-size:13px;border-collapse:collapse;margin-top:6px}
@@ -295,14 +301,17 @@
     <div class="card"><h2>Knockout progress</h2><div id="koLive"></div></div>
   </section>
 
+  <div id="entryModal" class="modal hide"><div class="modalbox"><button class="modalx" id="modalClose">✕</button><div id="modalBody"></div></div></div>
+
   <p class="foot">Made for friends • Group draw &amp; opener per the official FIFA 2026 final draw • Bracket is a representative seeding • Results via live sports feed • Not affiliated with FIFA</p>
 </div>
 
 <script>
 /* =========================== CONFIG =========================== */
 const CONFIG = {
-  openerISO: "2026-06-11T00:00:00-07:00",
+  openerISO: "2026-06-11T18:00:00-06:00",   // ← real opener kickoff (placeholder) — tell me the exact time
   lockISO:   "2026-06-10T23:00:00-07:00",
+  revealOffsetMin: 30,                        // others' picks become visible this many minutes before kickoff
   resultsEndpoint: null,
   sportsdb: { key: "3", leagueId: "4429", season: "2026" },
   pollMs: 60000, entriesPollMs: 15000,
@@ -430,6 +439,8 @@ const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 const lockTime=new Date(CONFIG.lockISO).getTime();
 const isLocked=()=>Date.now()>=lockTime;
+const revealTime=new Date(CONFIG.openerISO).getTime()-(CONFIG.revealOffsetMin||30)*60000;
+const picksRevealed=()=>Date.now()>=revealTime;
 const fa=c=>{const t=TEAM[c];return t?t[2]+' '+t[1]:'';};
 const escapeHtml=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -590,8 +601,8 @@ function renderBracket(){
     rd.ids.forEach(id=>col.appendChild(koMatchBox(id,sm,actM,editable)));
     wrap.appendChild(col);
   });
-  const champ=state.bracket[FINID];const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));wrap.appendChild(cb);
   const bcol=el('div','bcol');bcol.appendChild(el('h4',null,'3rd-place playoff'));bcol.appendChild(koMatchBox(BRONZEID,sm,actM,editable));const bw=state.bracket[BRONZEID];if(bw)bcol.appendChild(el('div','pl','🥉 '+fa(bw)));wrap.appendChild(bcol);
+  const champ=state.bracket[FINID];const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));wrap.appendChild(cb);
   if(_afId){const e=document.getElementById(_afId);if(e)e.focus();}
   refreshSummary();
 }
@@ -638,10 +649,34 @@ function renderBoard(){
   rows.sort((a,b)=>b.total-a.total||(b.groupCorrect+b.wcCorrect+b.koCorrect)-(a.groupCorrect+a.wcCorrect+a.koCorrect)||a.at-b.at);
   let h=`<table class="lb"><thead><tr><th>#</th><th>Player</th><th class="num">Grp</th><th class="num">WC</th><th class="num">KO</th><th class="num">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{const me=r.id===state.myId?' class="me"':'';const md=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
-    h+=`<tr${me}><td class="rank">${md}</td><td>${escapeHtml(r.name)}${r.id===state.myId?' <span class="muted">(you)</span>':''}</td><td class="num">${r.groupCorrect}</td><td class="num">${r.wcCorrect}</td><td class="num">${r.koCorrect}</td><td class="num total">${r.total}</td></tr>`;});
+    h+=`<tr${me} style="cursor:pointer" onclick="showEntry('${r.id}')" title="View this entry"><td class="rank">${md}</td><td>${escapeHtml(r.name)}${r.id===state.myId?' <span class="muted">(you)</span>':''}</td><td class="num">${r.groupCorrect}</td><td class="num">${r.wcCorrect}</td><td class="num">${r.koCorrect}</td><td class="num total">${r.total}</td></tr>`;});
   h+='</tbody></table>';root.innerHTML=h;
   const scored=Object.keys(state.results.matches).length;
-  $('#boardMeta').textContent=scored?`${ids.length} players • live scoring in progress`:`${ids.length} players • standings move once matches kick off`;
+  const rev=picksRevealed()?'tap a player to see their picks':"others' picks reveal 30 min before kickoff";
+  $('#boardMeta').textContent=`${ids.length} players • ${scored?'live scoring in progress':'standings move once matches kick off'} • ${rev}`;
+}
+
+/* =========================== ENTRY VIEW (reveal-gated) =========================== */
+function closeModal(){const m=$('#entryModal');if(m)m.classList.add('hide');}
+function showEntry(id){
+  const e=state.entries[id];if(!e)return;const body=$('#modalBody');
+  if(id!==state.myId && !picksRevealed()){
+    body.innerHTML=`<h3>🔒 Picks hidden</h3><p class="muted">${escapeHtml(e.name||'This player')}'s picks unlock <b>30 minutes before kickoff</b> — ${new Date(revealTime).toLocaleString()}. After that, every entry stays visible for the whole tournament.</p>`;
+    $('#entryModal').classList.remove('hide');return;
+  }
+  const adv=bracketAdvancers(e);const tl=a=>(a&&a.length)?a.map(fa).join(' · '):'—';
+  body.innerHTML=`<h3>${escapeHtml(e.name||'Entry')}${id===state.myId?' (you)':''}</h3>
+    <p><b>🏆 Champion:</b> ${adv.champion?fa(adv.champion):'—'}</p>
+    <p><b>🥈 Finalists:</b> ${tl(adv.F)}</p>
+    <p><b>🥉 3rd place:</b> ${(e.bracket&&e.bracket['B'])?fa(e.bracket['B']):'—'}</p>
+    <p><b>Semi-finalists:</b> ${tl(adv.SF)}</p>
+    <p><b>Quarter-finalists:</b> ${tl(adv.QF)}</p>
+    <p><b>Round of 16:</b> ${tl(adv.R16)}</p>
+    <h4>Groups — 1st / 2nd</h4>
+    ${GLETTERS.map(g=>{const gp=e.groupPicks&&e.groupPicks[g];return `<p style="margin:2px 0">Grp ${g}: ${gp?(fa(gp.first)+' <span class="muted">/</span> '+fa(gp.second)):'—'}</p>`;}).join('')}
+    <h4>Wild cards</h4><p>${tl(e.wildcards)}</p>
+    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Group match scores</summary>${GLETTERS.map(g=>'<div style="margin-top:8px"><b>Group '+g+'</b></div>'+MATCHES.filter(m=>m.group===g).map(m=>{const s=e.scores&&e.scores[m.id];return `<div class="muted" style="font-size:12px">${fa(m.home)} <b>${s?s.h+'–'+s.a:'·'}</b> ${fa(m.away)}</div>`;}).join('')).join('')}</details>`;
+  $('#entryModal').classList.remove('hide');
 }
 
 /* =========================== LIVE RESULTS =========================== */
@@ -732,6 +767,9 @@ async function fetchLive(){
 function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$('#tab-picks').classList.toggle('hide',name!=='picks');$('#tab-board').classList.toggle('hide',name!=='board');$('#tab-results').classList.toggle('hide',name!=='results');if(name!=='picks')fetchLive();}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('#refreshNow').onclick=fetchLive;
+$('#modalClose').onclick=closeModal;
+$('#entryModal').onclick=e=>{if(e.target.id==='entryModal')closeModal();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 $('#playerName').oninput=()=>{saveDraft();};
 $('#randomFill').onclick=()=>{if(isLocked())return;for(const m of MATCHES){if(!state.scores[m.id]){const h=Math.floor(Math.random()*4),a=Math.floor(Math.random()*4);state.scores[m.id]={h,a};state.picks[m.id]=deriveOutcome(h,a);}}recomputeQualifiers();applyAll();saveDraft();};
 $('#clearPicks').onclick=()=>{if(isLocked())return;state.picks={};state.scores={};state.wildcards=[];state.koScores={};state.koPens={};state.bracket={};recomputeQualifiers();applyAll();saveDraft();};
