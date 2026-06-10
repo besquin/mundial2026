@@ -217,10 +217,9 @@
 
     <div class="card">
       <h2>1️⃣ Group stage</h2>
-      <p class="muted">Enter your predicted <b>score</b> for each match if you like (exact scores earn a bonus 🎯) — your table with goal difference updates live and the <span class="qual">1st</span> / <span style="color:var(--blue)">2nd</span> are highlighted. Then confirm who finishes <b>1st</b> and <b>2nd</b> in each group (that's what's scored).</p>
+      <p class="muted">Enter the <b>score</b> of every match (required; exact scores earn a bonus 🎯). Your table updates live and the top two — <span class="qual">1st</span> / <span style="color:var(--blue)">2nd</span> — are set <b>automatically</b> from your scores (goal difference breaks ties).</p>
       <div class="btnrow" style="margin:8px 0 4px">
         <button class="btn ghost sm" id="randomFill">🎲 Fill match blanks</button>
-        <button class="btn ghost sm" id="syncStandings">↧ Set 1st/2nd from my matches</button>
         <button class="btn ghost sm" id="clearPicks">↺ Clear all</button>
       </div>
       <div id="groups"></div>
@@ -246,7 +245,7 @@
       <div class="progress"><i id="progBar"></i></div>
       <div class="summary">
         <div class="stat"><b id="sScores">0/72</b><span>Match scores</span></div>
-        <div class="stat"><b id="sGroups">0/12</b><span>Groups 1st&2nd</span></div>
+        <div class="stat"><b id="sGroups">0/12</b><span>Groups scored</span></div>
         <div class="stat"><b id="sWild">0/8</b><span>Wild cards</span></div>
         <div class="stat"><b id="sBracket">0/31</b><span>Bracket ties</span></div>
         <div class="stat"><b id="sScore">—</b><span>Your live score</span></div>
@@ -493,12 +492,11 @@ function onScore(id){
   if(hv!==''&&av!==''&&Number(hv)>=0&&Number(av)>=0){const h=Number(hv),a=Number(av);state.scores[id]={h,a};state.picks[id]=deriveOutcome(h,a);}
   else{delete state.scores[id];delete state.picks[id];}
   $('#sh-'+id).classList.toggle('set',!!state.scores[id]);$('#sa-'+id).classList.toggle('set',!!state.scores[id]);
-  const g=id[0];syncGroupDefaults(g);renderGroupPred(g);saveDraft();renderBracket();
+  const g=id[0];recomputeQualifiers(g);renderGroupPred(g);saveDraft();renderBracket();
 }
-function syncGroupDefaults(g){
+function recomputeQualifiers(g){
   const tb=tableFromScores(state.scores);
-  const groups=g?[g]:GLETTERS;
-  groups.forEach(gg=>{ if(!state.groupManual[gg]){ state.groupPicks[gg]={first:tb[gg][0].code,second:tb[gg][1].code}; } });
+  (g?[g]:GLETTERS).forEach(gg=>{ state.groupPicks[gg]={first:tb[gg][0].code,second:tb[gg][1].code}; });
 }
 function renderGroupPred(g){
   const tb=tableFromScores(state.scores)[g];
@@ -510,16 +508,10 @@ function renderGroupPred(g){
     const tag=r.code===gp.first?'<span class="tag t1">1st</span>':(r.code===gp.second?'<span class="tag t2">2nd</span>':'');
     rows+=`<tr class="${cls}"><td>${i+1}</td><td>${fa(r.code)} ${tag}</td><td class="num">${r.pts}p ${r.gd>0?'+':''}${r.gd}</td></tr>`;
   });
-  const opts=sel=>GROUPS[g].map(t=>`<option value="${t[0]}" ${sel===t[0]?'selected':''}>${t[2]} ${t[1]}</option>`).join('');
-  c.innerHTML=`<div class="lbl">Predicted finish (live)</div>
-    <table class="mini"><tbody>${rows}</tbody></table>
-    <div class="predsel">
-      <div><label class="fld" style="margin:0">Finishes 1st</label><select id="g1-${g}"><option value="">—</option>${opts(gp.first)}</select></div>
-      <div><label class="fld" style="margin:0">Finishes 2nd</label><select id="g2-${g}"><option value="">—</option>${opts(gp.second)}</select></div>
-    </div>`;
-  $('#g1-'+g).onchange=e=>{state.groupManual[g]=true;state.groupPicks[g].first=e.target.value||null;if(state.groupPicks[g].first&&state.groupPicks[g].first===state.groupPicks[g].second)state.groupPicks[g].second=null;renderGroupPred(g);saveDraft();renderBracket();};
-  $('#g2-'+g).onchange=e=>{state.groupManual[g]=true;state.groupPicks[g].second=e.target.value||null;if(state.groupPicks[g].second&&state.groupPicks[g].second===state.groupPicks[g].first)state.groupPicks[g].first=null;renderGroupPred(g);saveDraft();renderBracket();};
-  const done=gp.first&&gp.second;const gpEl=$('#gp-'+g);if(gpEl)gpEl.textContent=done?'✓ 1st & 2nd set':'set 1st & 2nd';
+  c.innerHTML=`<div class="lbl">Predicted finish — 1st & 2nd set automatically from your scores</div>
+    <table class="mini"><tbody>${rows}</tbody></table>`;
+  const scored=MATCHES.filter(m=>m.group===g&&state.scores[m.id]).length;
+  const gpEl=$('#gp-'+g);if(gpEl)gpEl.textContent=scored+'/6 scored';
 }
 function renderAllGroups(){GLETTERS.forEach(renderGroupPred);}
 
@@ -549,8 +541,8 @@ function renderBracket(){
   recomputeBracket();
   const sm=seedMap();const wrap=$('#bracket');if(!wrap)return;wrap.innerHTML='';
   const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
-  const seedsReady=GLETTERS.every(g=>state.groupPicks[g].first&&state.groupPicks[g].second)&&state.wildcards.length===8;
-  $('#bracketNote').innerHTML=seedsReady?'Enter the <b>score</b> of every tie — higher score advances (no draws). Exact scores earn the bonus 🎯, and round points rise as you go.':'⛏️ Finish your <b>group 1st & 2nd</b> for all 12 groups and pick your <b>8 wild cards</b> to unlock the bracket.';
+  const seedsReady=Object.keys(state.scores).length===MATCHES.length&&state.wildcards.length===8;
+  $('#bracketNote').innerHTML=seedsReady?'Enter the <b>score</b> of every tie — higher score advances (no draws). Exact scores earn the bonus 🎯, and round points rise as you go.':'⛏️ Enter <b>all group scores</b> and pick your <b>8 wild cards</b> to unlock the bracket (it seeds from your auto-ranked 1st/2nd + wild cards).';
   KO_ROUNDS.forEach(rd=>{
     const col=el('div','bcol');col.appendChild(el('h4',null,rd.label));if(rd.pts)col.appendChild(el('div','pl','+'+rd.pts+'/team'));
     rd.ids.forEach(id=>{
@@ -576,22 +568,21 @@ function autoFillBracket(){
 
 function refreshSummary(){
   const scoresDone=Object.keys(state.scores).length;
-  const groupsDone=GLETTERS.filter(g=>state.groupPicks[g].first&&state.groupPicks[g].second).length;
+  const groupsDone=GLETTERS.filter(g=>MATCHES.filter(m=>m.group===g&&state.scores[m.id]).length===6).length;
   const ties=Object.keys(state.bracket).length;
   $('#sScores').textContent=scoresDone+'/'+MATCHES.length;
   $('#sGroups').textContent=groupsDone+'/12';
   $('#sWild').textContent=state.wildcards.length+'/8';
   $('#sBracket').textContent=ties+'/'+TOTAL_TIES;
-  const frac=(scoresDone+groupsDone*2+Math.min(state.wildcards.length,8)+ties)/(MATCHES.length+24+8+TOTAL_TIES);
+  const frac=(scoresDone+Math.min(state.wildcards.length,8)+ties)/(MATCHES.length+8+TOTAL_TIES);
   $('#progBar').style.width=(frac*100).toFixed(1)+'%';
   const hasRes=Object.keys(state.results.matches).length||state.actual.champion||(state.actual.wildcards||[]).length;
   $('#sScore').textContent=hasRes?scoreEntry(currentEntry()).total:'—';
-  const complete=scoresDone===MATCHES.length&&groupsDone===12&&state.wildcards.length===8&&ties===TOTAL_TIES&&$('#playerName').value.trim();
+  const complete=scoresDone===MATCHES.length&&state.wildcards.length===8&&ties===TOTAL_TIES&&$('#playerName').value.trim();
   $('#submitBtn').disabled=isLocked()||!complete;
   if(isLocked())$('#submitMsg').textContent='Entries are locked.';
   else if(!$('#playerName').value.trim())$('#submitMsg').textContent='Enter your name to submit.';
-  else if(scoresDone<MATCHES.length)$('#submitMsg').textContent=`Enter scores for all matches — ${MATCHES.length-scoresDone} left (try 🎲 Fill match blanks).`;
-  else if(groupsDone<12)$('#submitMsg').textContent=`Set 1st & 2nd for ${12-groupsDone} more group(s).`;
+  else if(scoresDone<MATCHES.length)$('#submitMsg').textContent=`Enter scores for all matches — ${MATCHES.length-scoresDone} left (try 🎲 Fill match blanks). 1st/2nd are set automatically.`;
   else if(state.wildcards.length<8)$('#submitMsg').textContent=`Pick ${8-state.wildcards.length} more wild card(s).`;
   else if(ties<TOTAL_TIES)$('#submitMsg').textContent=`Finish the bracket — ${TOTAL_TIES-ties} tie(s) need a non-draw score (try ⚡ Auto-fill).`;
   else $('#submitMsg').textContent='All set! Submit your entry. 🎉';
@@ -701,26 +692,24 @@ function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classLis
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('#refreshNow').onclick=fetchLive;
 $('#playerName').oninput=()=>{saveDraft();};
-$('#randomFill').onclick=()=>{if(isLocked())return;for(const m of MATCHES){if(!state.scores[m.id]){const h=Math.floor(Math.random()*4),a=Math.floor(Math.random()*4);state.scores[m.id]={h,a};state.picks[m.id]=deriveOutcome(h,a);}}syncGroupDefaults();applyAll();saveDraft();};
-$('#syncStandings').onclick=()=>{if(isLocked())return;GLETTERS.forEach(g=>state.groupManual[g]=false);syncGroupDefaults();renderAllGroups();renderBracket();saveDraft();};
-$('#clearPicks').onclick=()=>{if(isLocked())return;state.picks={};state.scores={};state.groupPicks={};state.groupManual={};GLETTERS.forEach(g=>state.groupPicks[g]={first:null,second:null});state.wildcards=[];state.bracket={};applyAll();saveDraft();};
+$('#randomFill').onclick=()=>{if(isLocked())return;for(const m of MATCHES){if(!state.scores[m.id]){const h=Math.floor(Math.random()*4),a=Math.floor(Math.random()*4);state.scores[m.id]={h,a};state.picks[m.id]=deriveOutcome(h,a);}}recomputeQualifiers();applyAll();saveDraft();};
+$('#clearPicks').onclick=()=>{if(isLocked())return;state.picks={};state.scores={};state.wildcards=[];state.koScores={};state.bracket={};recomputeQualifiers();applyAll();saveDraft();};
 $('#autoBracket').onclick=autoFillBracket;
 $('#clearBracket').onclick=()=>{if(isLocked())return;state.koScores={};state.bracket={};renderBracket();saveDraft();};
 $('#copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(enc());toast($('#copyCode'),'Copied!');}catch{$('#importBox').classList.remove('hide');$('#importText').value=enc();}};
 $('#downloadBtn').onclick=()=>{const blob=new Blob([JSON.stringify(currentEntry(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='my-worldcup-picks.json';a.click();};
 $('#importBtn').onclick=()=>$('#importBox').classList.toggle('hide');
 $('#importCancel').onclick=()=>$('#importBox').classList.add('hide');
-$('#importApply').onclick=()=>{try{const d=dec($('#importText').value);state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};if(d.groupPicks){state.groupPicks=d.groupPicks;GLETTERS.forEach(g=>{if(!state.groupPicks[g])state.groupPicks[g]={first:null,second:null};state.groupManual[g]=true;});}if(d.name)$('#playerName').value=d.name;recomputeBracket();applyAll();saveDraft();$('#importBox').classList.add('hide');toast($('#importApply'),'Loaded!');}catch(e){alert('Could not read that pick code.');}};
+$('#importApply').onclick=()=>{try{const d=dec($('#importText').value);state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};if(d.name)$('#playerName').value=d.name;recomputeQualifiers();recomputeBracket();applyAll();saveDraft();$('#importBox').classList.add('hide');toast($('#importApply'),'Loaded!');}catch(e){alert('Could not read that pick code.');}};
 function enc(){return btoa(unescape(encodeURIComponent(JSON.stringify({name:$('#playerName').value.trim(),scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,v:5}))));}
 function dec(code){return JSON.parse(decodeURIComponent(escape(atob(code.trim()))));}
 
 $('#submitBtn').onclick=async()=>{
   if(isLocked())return;const name=$('#playerName').value.trim();if(!name)return;
-  const groupsDone=GLETTERS.filter(g=>state.groupPicks[g].first&&state.groupPicks[g].second).length;
-  if(Object.keys(state.scores).length!==MATCHES.length||groupsDone<12||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
+  if(Object.keys(state.scores).length!==MATCHES.length||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
   if(!state.myId){state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);localStorage.setItem('wc_my_id',state.myId);}
   const existing=state.entries[state.myId];
-  recomputeBracket();
+  recomputeQualifiers();recomputeBracket();
   const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,bracket:state.bracket,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
   const hadPool=!!Store.poolId;$('#submitBtn').disabled=true;$('#submitMsg').textContent='Saving…';
   try{await Store.saveEntry(state.myId,entry);setModeBanner();if(!hadPool&&Store.poolId){$('#submitMsg').textContent='✅ Saved & pool created! Copy your invite link above. 🎉';$('#shareCard').scrollIntoView({behavior:'smooth',block:'center'});}else{$('#submitMsg').textContent='✅ Entry saved! Switching to leaderboard…';setTimeout(()=>switchTab('board'),700);}$('#submitBtn').disabled=false;}
@@ -728,12 +717,12 @@ $('#submitBtn').onclick=async()=>{
 };
 $('#copyShare').onclick=async()=>{try{await navigator.clipboard.writeText(Store.shareUrl||'');toast($('#copyShare'),'Copied!');}catch{const i=$('#shareUrl');i.select();document.execCommand&&document.execCommand('copy');toast($('#copyShare'),'Copied!');}};
 
-function saveDraft(){localStorage.setItem('wc_draft',JSON.stringify({name:$('#playerName').value,scores:state.scores,groupPicks:state.groupPicks,groupManual:state.groupManual,wildcards:state.wildcards,koScores:state.koScores}));refreshSummary();}
-function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft')||'null');if(d){if(d.name)$('#playerName').value=d.name;state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};state.groupManual=d.groupManual||{};if(d.groupPicks){state.groupPicks=d.groupPicks;GLETTERS.forEach(g=>{if(!state.groupPicks[g])state.groupPicks[g]={first:null,second:null};});}}}catch{}}
+function saveDraft(){localStorage.setItem('wc_draft',JSON.stringify({name:$('#playerName').value,scores:state.scores,wildcards:state.wildcards,koScores:state.koScores}));refreshSummary();}
+function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft')||'null');if(d){if(d.name)$('#playerName').value=d.name;state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};}}catch{}}
 function toast(btn,msg){const o=btn.textContent;btn.textContent=msg;setTimeout(()=>btn.textContent=o,1200);}
 
 /* =========================== COUNTDOWN =========================== */
-function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){c.textContent='LOCKED';$('#lockBanner').classList.remove('hide');document.querySelectorAll('#groups input, #groups select, #bracket input, #randomFill, #syncStandings, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){c.textContent='LOCKED';$('#lockBanner').classList.remove('hide');document.querySelectorAll('#groups input, #bracket input, #randomFill, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 
 /* =========================== RENDER static bits =========================== */
 function renderPrizes(){const e=$('#prizeList');if(!e)return;e.innerHTML=(CONFIG.prizes||[]).map(p=>`<div class="stat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;margin:0 0 8px"><b style="font-size:15px">${escapeHtml(p.place)}</b><span style="color:var(--txt)">${escapeHtml(p.prize)}</span></div>`).join('');}
@@ -752,7 +741,7 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
 (async function init(){
   renderPrizes();renderScoreRules();
   buildGroups();buildWildcards();
-  loadDraft();syncGroupDefaults();applyAll();
+  loadDraft();recomputeQualifiers();applyAll();
   Store.onEntries(d=>{state.entries=d||{};renderBoard();});
   await Store.init();setModeBanner();
   tickClock();setInterval(tickClock,1000);
