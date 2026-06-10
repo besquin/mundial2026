@@ -17,11 +17,13 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 ## How to play
 1. Open the app link (or scan the QR above).
 2. Enter your display name.
-3. Pick a **winner or draw** for every group-stage match (use 🎲 *Fill blanks
-   randomly* if you're in a hurry).
-4. Choose the **8 wild cards** — the third-placed teams you think will grab the
-   last 8 spots in the Round of 32.
-5. Hit **Submit**. The first person to submit **creates the pool** and gets an
+3. Enter a **predicted score** for **every** group match (required; use 🎲 *Fill
+   match blanks* if you're in a hurry). Your group table updates live.
+4. Confirm each group's **1st & 2nd**, then choose the **8 wild cards** — the
+   third-placed teams you think grab the last 8 Round-of-32 spots.
+5. Fill the **knockout bracket** by entering a **score** for every tie (higher
+   score advances; ⚡ *Auto-fill* favours higher seeds), up to the champion.
+6. Hit **Submit**. The first person to submit **creates the pool** and gets an
    **invite link** (with its own QR code) — share it so everyone lands on the
    **same live leaderboard**.
 
@@ -32,11 +34,13 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 | Correct group **runner-up** (2nd) | **+1** each |
 | Correct **wild card** (3rd-placed qualifier) | **+2** each |
 | Correct group **match result** | **+1** each |
-| **Exact scoreline** of a match (e.g. you said 2–1, it finished 2–1) | **+2** bonus |
+| **Exact scoreline** — on **every** match, group *and* knockout | **+2** bonus |
 | Team reaches **Round of 16 / QF / SF / Final** | **+2 / +4 / +8 / +12** each |
 | Correct **Champion** | **+20** |
 | **Exact knockout tie** (both teams meet + you pick the winner) | **+3** bonus |
-| **Maximum** | **501** |
+| **Maximum** | **563** |
+
+Score entry is **mandatory** for all 72 group matches and all 31 knockout ties.
 
 Knockouts are scored two ways at once: points for each of your teams that actually
 reaches a round (progression), **plus** a bonus whenever a tie you predicted really

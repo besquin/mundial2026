@@ -63,6 +63,10 @@
   .gin::-webkit-outer-spin-button,.gin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .gin:focus{border-color:var(--acc)} .gin.set{border-color:rgba(34,197,94,.5)}
   .dash{color:var(--mut)}
+  .bgin{width:40px;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px;font-size:13px;text-align:center;outline:none;-moz-appearance:textfield}
+  .bgin::-webkit-outer-spin-button,.bgin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .bgin:focus{border-color:var(--acc)}
+  .bmatch.draw{outline:1px solid rgba(239,68,68,.55)}
   .pred{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
   .pred .lbl{font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .mini{width:100%;font-size:13px;border-collapse:collapse;margin-top:6px}
@@ -198,10 +202,10 @@
       <h2>Scoring summary</h2>
       <div class="progress"><i id="progBar"></i></div>
       <div class="summary">
-        <div class="stat"><b id="sGroups">0/12</b><span>Groups (1st&2nd)</span></div>
+        <div class="stat"><b id="sScores">0/72</b><span>Match scores</span></div>
+        <div class="stat"><b id="sGroups">0/12</b><span>Groups 1st&2nd</span></div>
         <div class="stat"><b id="sWild">0/8</b><span>Wild cards</span></div>
         <div class="stat"><b id="sBracket">0/31</b><span>Bracket ties</span></div>
-        <div class="stat"><b id="sMax">0</b><span>Max points</span></div>
         <div class="stat"><b id="sScore">—</b><span>Your live score</span></div>
       </div>
     </div>
@@ -321,7 +325,7 @@ const codeOf=name=>NAMEMAP[norm(name)]||null;
 
 /* =========================== STATE =========================== */
 const state={
-  picks:{}, scores:{}, groupPicks:{}, groupManual:{}, wildcards:[], bracket:{},
+  picks:{}, scores:{}, groupPicks:{}, groupManual:{}, wildcards:[], koScores:{}, bracket:{},
   myId:localStorage.getItem('wc_my_id')||null,
   entries:{},
   results:{matches:{},scores:{}},
@@ -391,7 +395,7 @@ function seedMap(){
   return m;
 }
 function koCode(side,sm){return side.seed?(sm[side.seed]||null):(state.bracket[side.match]||null);}
-function normalizeBracket(){const sm=seedMap();for(const m of KO){const a=koCode(m.a,sm),b=koCode(m.b,sm);const w=state.bracket[m.id];if(w&&w!==a&&w!==b)delete state.bracket[m.id];}}
+function recomputeBracket(){const sm=seedMap();for(const m of KO){const a=koCode(m.a,sm),b=koCode(m.b,sm);const sc=state.koScores[m.id];let w=null;if(a&&b&&sc&&Number.isFinite(sc.h)&&Number.isFinite(sc.a)&&sc.h!==sc.a)w=sc.h>sc.a?a:b;if(w)state.bracket[m.id]=w;else delete state.bracket[m.id];}}
 function bracketAdvancers(entry){
   const w=entry.bracket||{};const win=ids=>ids.map(id=>w[id]).filter(Boolean);
   return{R16:win(R32IDS),QF:win(R16IDS),SF:win(QFIDS),F:win(SFIDS),champion:w[FINID]||null};
@@ -410,9 +414,13 @@ function scoreEntry(e){
   // exact-tie bonus: a knockout match you predicted (both teams + the winner) actually happened
   let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.pair]=am.winner;});
   predictedTies(e).forEach(t=>{if(actM[t.pair]&&actM[t.pair]===t.winner){pts+=S.matchupBonus;bC++;}});
-  return{total:pts,matchCorrect:mC,exactScores:eC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC,matchupHits:bC};
+  // exact-score bonus on knockout matches too
+  let kxC=0; const actG={}; (state.actual.koMatches||[]).forEach(am=>{if(am.g)actG[am.pair]=am.g;});
+  const smE=seedMapFor(e);
+  for(const m of KO){const a=koCodeFor(e,m.a,smE),b=koCodeFor(e,m.b,smE);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc)continue;const ag=actG[[a,b].sort().join('|')];if(!ag)continue;if(ag[a]===sc.h&&ag[b]===sc.a){pts+=S.exactScore;kxC++;}}
+  return{total:pts,matchCorrect:mC,exactScores:eC+kxC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC,matchupHits:bC};
 }
-function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*(S.match+S.exactScore)+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion+KO.length*S.matchupBonus;}
+function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*(S.match+S.exactScore)+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion+KO.length*(S.matchupBonus+S.exactScore);}
 
 /* =========================== PICKS FORM =========================== */
 function buildGroups(){
@@ -485,67 +493,67 @@ function syncWildUI(){ALL_TEAMS.forEach(t=>{const c=$('#wc-'+t[0]);if(c)c.classL
 
 /* ---- bracket ---- */
 function seedStrength(){const sm=seedMap();const s={};Object.keys(sm).forEach(ref=>{const c=sm[ref];if(!c)return;s[c]=ref[0]==='1'?3:ref[0]==='2'?2:1;});return s;}
+function brow(id,code,side,key,val,w,aw){
+  const lbl=code?fa(code):(side.seed?seedLabel(side.seed):'Winner '+side.match);
+  const row=el('div','bteam'+(code?'':' empty')+(w&&w===code?' win':'')+(w&&w===code&&aw&&aw===code?' correct':''));
+  row.appendChild(el('span',null,escapeHtml(lbl)));
+  if(code&&!isLocked()){const inp=el('input');inp.type='number';inp.min=0;inp.className='bgin';inp.id='ks-'+id+'-'+key;if(val!=null)inp.value=val;inp.setAttribute('inputmode','numeric');inp.onchange=()=>onKoScore(id);row.appendChild(inp);}
+  else row.appendChild(el('span','res',val!=null?val:''));
+  return row;
+}
+function onKoScore(id){const h=$('#ks-'+id+'-h').value,a=$('#ks-'+id+'-a').value;if(h!==''&&a!==''&&Number(h)>=0&&Number(a)>=0)state.koScores[id]={h:Number(h),a:Number(a)};else delete state.koScores[id];recomputeBracket();renderBracket();saveDraft();}
 function renderBracket(){
-  normalizeBracket();
+  recomputeBracket();
   const sm=seedMap();const wrap=$('#bracket');if(!wrap)return;wrap.innerHTML='';
   const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
   const seedsReady=GLETTERS.every(g=>state.groupPicks[g].first&&state.groupPicks[g].second)&&state.wildcards.length===8;
-  if(!seedsReady){$('#bracketNote').innerHTML='⛏️ Finish your <b>group 1st & 2nd</b> for all 12 groups and pick your <b>8 wild cards</b> to unlock the bracket.';}
-  else {$('#bracketNote').innerHTML='Click the team you think wins each tie, all the way to the champion. Points rise every round.';}
+  $('#bracketNote').innerHTML=seedsReady?'Enter the <b>score</b> of every tie — higher score advances (no draws). Exact scores earn the bonus 🎯, and round points rise as you go.':'⛏️ Finish your <b>group 1st & 2nd</b> for all 12 groups and pick your <b>8 wild cards</b> to unlock the bracket.';
   KO_ROUNDS.forEach(rd=>{
-    const col=el('div','bcol');
-    col.appendChild(el('h4',null,rd.label));
-    if(rd.pts)col.appendChild(el('div','pl','+'+rd.pts+'/team'));
+    const col=el('div','bcol');col.appendChild(el('h4',null,rd.label));if(rd.pts)col.appendChild(el('div','pl','+'+rd.pts+'/team'));
     rd.ids.forEach(id=>{
-      const m=KOBYID[id];const a=koCode(m.a,sm),b=koCode(m.b,sm);const w=state.bracket[id];
+      const m=KOBYID[id];const a=koCode(m.a,sm),b=koCode(m.b,sm);const sc=state.koScores[id]||{};const w=state.bracket[id];
       const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
       const box=el('div','bmatch');
-      [['a',a,m.a],['b',b,m.b]].forEach(([k,code,side])=>{
-        const lbl=code?fa(code):(side.seed?seedLabel(side.seed):'Winner '+side.match);
-        const row=el('div','bteam'+(code?'':' empty')+(w&&w===code?' win':'')+(w&&w===code&&aw&&aw===w?' correct':''));
-        row.innerHTML=`<span>${escapeHtml(lbl)}</span>`;
-        if(code&&!isLocked())row.onclick=()=>{state.bracket[id]=code;normalizeBracket();renderBracket();saveDraft();};
-        box.appendChild(row);
-      });
+      box.appendChild(brow(id,a,m.a,'h',sc.h,w,aw));
+      box.appendChild(brow(id,b,m.b,'a',sc.a,w,aw));
+      if(sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a))box.classList.add('draw');
       col.appendChild(box);
     });
     wrap.appendChild(col);
   });
-  const champ=state.bracket[FINID];
-  const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));
-  cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));
-  wrap.appendChild(cb);
+  const champ=state.bracket[FINID];const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));wrap.appendChild(cb);
   refreshSummary();
 }
-function seedLabel(ref){const map={'1':'Winner ','2':'Runner-up '};if(ref[0]==='T')return '3rd #'+ref.slice(1);return (ref[0]==='1'?'Winner ':'Runner-up ')+'Grp '+ref.slice(1);}
+function seedLabel(ref){if(ref[0]==='T')return '3rd #'+ref.slice(1);return (ref[0]==='1'?'Winner ':'Runner-up ')+'Grp '+ref.slice(1);}
 function autoFillBracket(){
   if(isLocked())return;const str=seedStrength();
-  for(const m of KO){const sm=seedMap();const a=koCode(m.a,sm),b=koCode(m.b,sm);if(!a&&!b){continue;}if(a&&!b){state.bracket[m.id]=a;continue;}if(b&&!a){state.bracket[m.id]=b;continue;}const sa=str[a]||0,sb=str[b]||0;state.bracket[m.id]=(sb>sa)?b:a;}
-  renderBracket();saveDraft();
+  for(const m of KO){recomputeBracket();const sm=seedMap();const a=koCode(m.a,sm),b=koCode(m.b,sm);if(!a||!b)continue;const ex=state.koScores[m.id];if(ex&&Number.isFinite(ex.h)&&Number.isFinite(ex.a)&&ex.h!==ex.a)continue;const sa=str[a]||0,sb=str[b]||0;state.koScores[m.id]=(sb>sa)?{h:1,a:2}:{h:2,a:1};}
+  recomputeBracket();renderBracket();saveDraft();
 }
 
 function refreshSummary(){
+  const scoresDone=Object.keys(state.scores).length;
   const groupsDone=GLETTERS.filter(g=>state.groupPicks[g].first&&state.groupPicks[g].second).length;
   const ties=Object.keys(state.bracket).length;
+  $('#sScores').textContent=scoresDone+'/'+MATCHES.length;
   $('#sGroups').textContent=groupsDone+'/12';
   $('#sWild').textContent=state.wildcards.length+'/8';
   $('#sBracket').textContent=ties+'/'+TOTAL_TIES;
-  $('#sMax').textContent=maxPoints();
-  GLETTERS.forEach(g=>{const n=MATCHES.filter(m=>m.group===g&&state.picks[m.id]).length;});
-  const frac=(groupsDone*2+Math.min(state.wildcards.length,8)+ties)/(24+8+TOTAL_TIES);
+  const frac=(scoresDone+groupsDone*2+Math.min(state.wildcards.length,8)+ties)/(MATCHES.length+24+8+TOTAL_TIES);
   $('#progBar').style.width=(frac*100).toFixed(1)+'%';
   const hasRes=Object.keys(state.results.matches).length||state.actual.champion||(state.actual.wildcards||[]).length;
   $('#sScore').textContent=hasRes?scoreEntry(currentEntry()).total:'—';
-  const complete=groupsDone===12&&state.wildcards.length===8&&ties===TOTAL_TIES&&$('#playerName').value.trim();
+  const complete=scoresDone===MATCHES.length&&groupsDone===12&&state.wildcards.length===8&&ties===TOTAL_TIES&&$('#playerName').value.trim();
   $('#submitBtn').disabled=isLocked()||!complete;
   if(isLocked())$('#submitMsg').textContent='Entries are locked.';
   else if(!$('#playerName').value.trim())$('#submitMsg').textContent='Enter your name to submit.';
+  else if(scoresDone<MATCHES.length)$('#submitMsg').textContent=`Enter scores for all matches — ${MATCHES.length-scoresDone} left (try 🎲 Fill match blanks).`;
   else if(groupsDone<12)$('#submitMsg').textContent=`Set 1st & 2nd for ${12-groupsDone} more group(s).`;
   else if(state.wildcards.length<8)$('#submitMsg').textContent=`Pick ${8-state.wildcards.length} more wild card(s).`;
-  else if(ties<TOTAL_TIES)$('#submitMsg').textContent=`Complete the bracket — ${TOTAL_TIES-ties} tie(s) left (try ⚡ Auto-fill).`;
+  else if(ties<TOTAL_TIES)$('#submitMsg').textContent=`Finish the bracket — ${TOTAL_TIES-ties} tie(s) need a non-draw score (try ⚡ Auto-fill).`;
   else $('#submitMsg').textContent='All set! Submit your entry. 🎉';
 }
-function currentEntry(){return{name:$('#playerName').value.trim(),picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,bracket:state.bracket};}
+function currentEntry(){return{name:$('#playerName').value.trim(),picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,bracket:state.bracket};}
 function flash(node,msg){const f=el('span','muted',' '+msg);f.style.color='var(--gold)';node.appendChild(f);setTimeout(()=>f.remove(),1500);}
 function applyAll(){
   for(const m of MATCHES){const sh=$('#sh-'+m.id),sa=$('#sa-'+m.id);if(sh&&sa){const sc=state.scores[m.id];sh.value=sc?sc.h:'';sa.value=sc?sc.a:'';sh.classList.toggle('set',!!sc);sa.classList.toggle('set',!!sc);}}
@@ -654,41 +662,43 @@ $('#randomFill').onclick=()=>{if(isLocked())return;for(const m of MATCHES){if(!s
 $('#syncStandings').onclick=()=>{if(isLocked())return;GLETTERS.forEach(g=>state.groupManual[g]=false);syncGroupDefaults();renderAllGroups();renderBracket();saveDraft();};
 $('#clearPicks').onclick=()=>{if(isLocked())return;state.picks={};state.scores={};state.groupPicks={};state.groupManual={};GLETTERS.forEach(g=>state.groupPicks[g]={first:null,second:null});state.wildcards=[];state.bracket={};applyAll();saveDraft();};
 $('#autoBracket').onclick=autoFillBracket;
-$('#clearBracket').onclick=()=>{if(isLocked())return;state.bracket={};renderBracket();saveDraft();};
+$('#clearBracket').onclick=()=>{if(isLocked())return;state.koScores={};state.bracket={};renderBracket();saveDraft();};
 $('#copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(enc());toast($('#copyCode'),'Copied!');}catch{$('#importBox').classList.remove('hide');$('#importText').value=enc();}};
 $('#downloadBtn').onclick=()=>{const blob=new Blob([JSON.stringify(currentEntry(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='my-worldcup-picks.json';a.click();};
 $('#importBtn').onclick=()=>$('#importBox').classList.toggle('hide');
 $('#importCancel').onclick=()=>$('#importBox').classList.add('hide');
-$('#importApply').onclick=()=>{try{const d=dec($('#importText').value);state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.bracket=d.bracket||{};if(d.groupPicks){state.groupPicks=d.groupPicks;GLETTERS.forEach(g=>{if(!state.groupPicks[g])state.groupPicks[g]={first:null,second:null};state.groupManual[g]=true;});}if(d.name)$('#playerName').value=d.name;applyAll();saveDraft();$('#importBox').classList.add('hide');toast($('#importApply'),'Loaded!');}catch(e){alert('Could not read that pick code.');}};
-function enc(){return btoa(unescape(encodeURIComponent(JSON.stringify({name:$('#playerName').value.trim(),picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,bracket:state.bracket,v:4}))));}
+$('#importApply').onclick=()=>{try{const d=dec($('#importText').value);state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};if(d.groupPicks){state.groupPicks=d.groupPicks;GLETTERS.forEach(g=>{if(!state.groupPicks[g])state.groupPicks[g]={first:null,second:null};state.groupManual[g]=true;});}if(d.name)$('#playerName').value=d.name;recomputeBracket();applyAll();saveDraft();$('#importBox').classList.add('hide');toast($('#importApply'),'Loaded!');}catch(e){alert('Could not read that pick code.');}};
+function enc(){return btoa(unescape(encodeURIComponent(JSON.stringify({name:$('#playerName').value.trim(),scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,v:5}))));}
 function dec(code){return JSON.parse(decodeURIComponent(escape(atob(code.trim()))));}
 
 $('#submitBtn').onclick=async()=>{
   if(isLocked())return;const name=$('#playerName').value.trim();if(!name)return;
   const groupsDone=GLETTERS.filter(g=>state.groupPicks[g].first&&state.groupPicks[g].second).length;
-  if(groupsDone<12||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
+  if(Object.keys(state.scores).length!==MATCHES.length||groupsDone<12||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
   if(!state.myId){state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);localStorage.setItem('wc_my_id',state.myId);}
   const existing=state.entries[state.myId];
-  const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,bracket:state.bracket,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
+  recomputeBracket();
+  const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,bracket:state.bracket,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
   const hadPool=!!Store.poolId;$('#submitBtn').disabled=true;$('#submitMsg').textContent='Saving…';
   try{await Store.saveEntry(state.myId,entry);setModeBanner();if(!hadPool&&Store.poolId){$('#submitMsg').textContent='✅ Saved & pool created! Copy your invite link above. 🎉';$('#shareCard').scrollIntoView({behavior:'smooth',block:'center'});}else{$('#submitMsg').textContent='✅ Entry saved! Switching to leaderboard…';setTimeout(()=>switchTab('board'),700);}$('#submitBtn').disabled=false;}
   catch(e){$('#submitMsg').textContent='⚠️ Could not save: '+e.message;$('#submitBtn').disabled=false;}
 };
 $('#copyShare').onclick=async()=>{try{await navigator.clipboard.writeText(Store.shareUrl||'');toast($('#copyShare'),'Copied!');}catch{const i=$('#shareUrl');i.select();document.execCommand&&document.execCommand('copy');toast($('#copyShare'),'Copied!');}};
 
-function saveDraft(){localStorage.setItem('wc_draft',JSON.stringify({name:$('#playerName').value,scores:state.scores,groupPicks:state.groupPicks,groupManual:state.groupManual,wildcards:state.wildcards,bracket:state.bracket}));refreshSummary();}
-function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft')||'null');if(d){if(d.name)$('#playerName').value=d.name;state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.bracket=d.bracket||{};state.groupManual=d.groupManual||{};if(d.groupPicks){state.groupPicks=d.groupPicks;GLETTERS.forEach(g=>{if(!state.groupPicks[g])state.groupPicks[g]={first:null,second:null};});}}}catch{}}
+function saveDraft(){localStorage.setItem('wc_draft',JSON.stringify({name:$('#playerName').value,scores:state.scores,groupPicks:state.groupPicks,groupManual:state.groupManual,wildcards:state.wildcards,koScores:state.koScores}));refreshSummary();}
+function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft')||'null');if(d){if(d.name)$('#playerName').value=d.name;state.scores=d.scores||{};state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});state.wildcards=(d.wildcards||[]).slice(0,8);state.koScores=d.koScores||{};state.groupManual=d.groupManual||{};if(d.groupPicks){state.groupPicks=d.groupPicks;GLETTERS.forEach(g=>{if(!state.groupPicks[g])state.groupPicks[g]={first:null,second:null};});}}}catch{}}
 function toast(btn,msg){const o=btn.textContent;btn.textContent=msg;setTimeout(()=>btn.textContent=o,1200);}
 
 /* =========================== COUNTDOWN =========================== */
-function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){c.textContent='LOCKED';$('#lockBanner').classList.remove('hide');document.querySelectorAll('#groups input, #groups select, #randomFill, #syncStandings, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){c.textContent='LOCKED';$('#lockBanner').classList.remove('hide');document.querySelectorAll('#groups input, #groups select, #bracket input, #randomFill, #syncStandings, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 
 /* =========================== RENDER static bits =========================== */
 function renderPrizes(){const e=$('#prizeList');if(!e)return;e.innerHTML=(CONFIG.prizes||[]).map(p=>`<div class="stat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;margin:0 0 8px"><b style="font-size:15px">${escapeHtml(p.place)}</b><span style="color:var(--txt)">${escapeHtml(p.prize)}</span></div>`).join('');}
 function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<ul style="margin:0;padding-left:18px;line-height:1.7">
   <li><b>+${S.first}</b> correct group winner · <b>+${S.second}</b> correct runner-up (each group)</li>
   <li><b>+${S.wildcard}</b> each correct wild card (3rd-placed qualifier)</li>
-  <li><b>+${S.match}</b> correct match result · <b>+${S.exactScore}</b> bonus for nailing the exact score 🎯</li>
+  <li><b>+${S.match}</b> correct group-match result</li>
+  <li><b>+${S.exactScore}</b> exact scoreline 🎯 — on <b>every</b> match (group & knockout)</li>
   <li>Knockouts (per team reaching the round): R16 <b>+${S.r16}</b> · QF <b>+${S.qf}</b> · SF <b>+${S.sf}</b> · Final <b>+${S.finalist}</b> · Champion <b>+${S.champion}</b></li>
   <li>Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet & you pick the winner)</li>
   <li>Max <b>${maxPoints()}</b> pts · auto-scored from a live feed</li></ul>`;}
