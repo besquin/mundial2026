@@ -146,6 +146,25 @@
 
   <!-- ================= PICKS ================= -->
   <section id="tab-picks">
+    <div class="card" id="rulesCard">
+      <h2>📜 Rules &amp; Prizes</h2>
+      <div class="grid2" style="margin-top:8px">
+        <div>
+          <div class="muted" style="font-weight:700;color:var(--txt);margin-bottom:6px">🏅 Scoring</div>
+          <ul class="muted" style="margin:0;padding-left:18px;line-height:1.7">
+            <li><b>+3 pts</b> — correct group-match result (win / draw / win)</li>
+            <li><b>+5 pts</b> — correct wild-card team (3rd-placed side that advances)</li>
+            <li>Maximum <b>256 pts</b></li>
+            <li>Ties: most correct picks, then earliest entry</li>
+            <li>Results auto-scored from a live feed — no manual entry</li>
+          </ul>
+        </div>
+        <div>
+          <div class="muted" style="font-weight:700;color:var(--txt);margin-bottom:6px">🏆 Prizes</div>
+          <div id="prizeList"></div>
+        </div>
+      </div>
+    </div>
     <div id="lockBanner" class="banner locked hide">🔒 <b>Entries are locked.</b> The tournament has kicked off — results are now scored automatically. Head to the Leaderboard.</div>
     <div id="modeBanner" class="banner warn"></div>
 
@@ -279,6 +298,13 @@ const CONFIG = {
   sportsdb: { key: "3", leagueId: "4429", season: "2026" },
   pollMs: 60000,
   entriesPollMs: 15000,
+
+  // Prizes shown at the top of the app. Edit the text after each colon.
+  prizes: [
+    { place: "🥇 1st place", prize: "TBD — edit me in CONFIG.prizes" },
+    { place: "🥈 2nd place", prize: "TBD — edit me in CONFIG.prizes" },
+    { place: "🥉 3rd place", prize: "TBD — edit me in CONFIG.prizes" }
+  ],
 
   // PASTE your Firebase Realtime Database config below to share ONE leaderboard
   // across all your friends. Leave databaseURL empty to run in local mode.
@@ -450,6 +476,14 @@ function scoreEntry(entry){
 const enc = () => btoa(unescape(encodeURIComponent(JSON.stringify({ name:$('#playerName').value.trim(), picks:state.picks, wildcards:state.wildcards, v:2 }))));
 const dec = code => JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderPrizes(){
+  const el = $('#prizeList'); if(!el) return;
+  el.innerHTML = (CONFIG.prizes||[]).map(p=>
+    `<div class="stat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;margin:0 0 8px">
+       <b style="font-size:15px">${escapeHtml(p.place)}</b>
+       <span style="color:var(--txt)">${escapeHtml(p.prize)}</span>
+     </div>`).join('');
+}
 
 /* =========================================================================
    RENDER — picks form
@@ -780,7 +814,7 @@ function renderShare(){
   }
 }
 (async function init(){
-  buildGroups(); buildWildcards();
+  buildGroups(); buildWildcards(); renderPrizes();
   loadDraft(); applyPicksToForm();
   Store.onEntries(d=>{ state.entries=d||{}; renderBoard(); });
   await Store.init();
