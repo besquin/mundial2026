@@ -205,8 +205,10 @@
   <section id="tab-picks">
     <div class="card" style="border-color:rgba(34,197,94,.55);box-shadow:0 8px 24px rgba(34,197,94,.18)">
       <h2>👤 Your name</h2>
-      <p class="muted">This is how your entry shows up on the leaderboard — make it unique (e.g. add an emoji) so friends can tell entries apart.</p>
+      <p class="muted">This is how your entry shows up on the leaderboard — make it unique (e.g. add an emoji) so friends can tell entries apart. <b>Editing on a different device?</b> Type the same name and tap <b>Load my entry</b>.</p>
       <input type="text" id="playerName" placeholder="Enter your name… e.g. Alex 🐐" maxlength="28" autocomplete="off"/>
+      <div class="btnrow" style="margin-top:8px"><button class="btn ghost sm" id="loadMine">↻ Load my entry</button></div>
+      <p class="muted" id="loadMineMsg" style="margin:6px 0 0"></p>
     </div>
     <div class="card" id="rulesCard">
       <h2>📜 Rules &amp; Prizes</h2>
@@ -707,6 +709,15 @@ function loadEntryIntoForm(e){
   recomputeQualifiers();recomputeBracket();applyAll();saveDraft();
 }
 function editMyPicks(){const e=state.entries[state.myId];if(e)loadEntryIntoForm(e);closeModal();switchTab('picks');}
+function nameKey(s){return String(s||'').trim().toLowerCase();}
+function findEntryIdByName(nm){const k=nameKey(nm);if(!k)return null;return Object.keys(state.entries).find(id=>nameKey(state.entries[id].name)===k)||null;}
+function loadMyEntryByName(){
+  const id=findEntryIdByName($('#playerName').value);
+  if(!id){$('#loadMineMsg').textContent='No entry found with that name yet. Type your exact name (as submitted), then tap Load.';return;}
+  state.myId=id;localStorage.setItem('wc_my_id_'+STOREKEY,id);
+  loadEntryIntoForm(state.entries[id]);
+  $('#loadMineMsg').textContent='✅ Loaded your entry — make changes and Submit to update it.';
+}
 function copyEditLink(){if(!state.myId)return;const u=location.origin+location.pathname+'?g='+GROUPKEY+'&me='+state.myId;try{navigator.clipboard.writeText(u);}catch(e){}window.prompt('Open this link on your phone (or any device) to edit your entry — it identifies your entry across devices:',u);}
 
 /* =========================== LIVE RESULTS =========================== */
@@ -798,6 +809,7 @@ function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classLis
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('#refreshNow').onclick=fetchLive;
 $('#editEntry').onclick=editMyPicks;
+$('#loadMine').onclick=loadMyEntryByName;
 $('#modalClose').onclick=closeModal;
 $('#entryModal').onclick=e=>{if(e.target.id==='entryModal')closeModal();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
@@ -817,7 +829,9 @@ function dec(code){return JSON.parse(decodeURIComponent(escape(atob(code.trim())
 $('#submitBtn').onclick=async()=>{
   if(isLocked())return;const name=$('#playerName').value.trim();if(!name)return;
   if(Object.keys(state.scores).length!==MATCHES.length||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
-  if(!state.myId){state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);localStorage.setItem('wc_my_id_'+STOREKEY,state.myId);}
+  const byName=findEntryIdByName(name); if(byName) state.myId=byName;   // same name = same entry across devices
+  if(!state.myId)state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  localStorage.setItem('wc_my_id_'+STOREKEY,state.myId);
   const existing=state.entries[state.myId];
   recomputeQualifiers();recomputeBracket();
   const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,koPens:state.koPens,bracket:state.bracket,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
