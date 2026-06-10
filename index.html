@@ -406,9 +406,10 @@ const ISDEFAULT=(GROUPKEY==='ribos'||GROUPKEY==='main');
 const STOREKEY=ISDEFAULT?'main':GROUPKEY;                                   // local-storage namespace
 const DBPATH=ISDEFAULT?'entries':('pools/'+GROUPKEY);                       // ribos = existing root 'entries'; others under 'pools/<g>'
 const GROUPLABEL=ISDEFAULT?'Ribos':(GROUPKEY.charAt(0).toUpperCase()+GROUPKEY.slice(1));
+const ME=((new URLSearchParams(location.search).get('me')||'').replace(/[^A-Za-z0-9_]/g,'').slice(0,40))||'';  // personal edit link ?me=<entryId>
 const state={
   picks:{}, scores:{}, groupPicks:{}, groupManual:{}, wildcards:[], koScores:{}, koPens:{}, bracket:{},
-  myId:localStorage.getItem('wc_my_id_'+STOREKEY)||(ISDEFAULT?localStorage.getItem('wc_my_id'):null)||null,
+  myId:ME||localStorage.getItem('wc_my_id_'+STOREKEY)||(ISDEFAULT?localStorage.getItem('wc_my_id'):null)||null,
   entries:{},
   results:{matches:{},scores:{}},
   standings:{},
@@ -682,7 +683,7 @@ function showEntry(id){
   }
   const adv=bracketAdvancers(e);const tl=a=>(a&&a.length)?a.map(fa).join(' · '):'—';
   body.innerHTML=`<h3>${escapeHtml(e.name||'Entry')}${id===state.myId?' (you)':''}</h3>
-    ${(id===state.myId&&!isLocked())?'<button class="btn sm" style="margin-bottom:8px" onclick="editMyPicks()">✏️ Edit my picks</button>':''}
+    ${id===state.myId?('<div class="btnrow" style="margin-bottom:8px">'+(!isLocked()?'<button class="btn sm" onclick="editMyPicks()">✏️ Edit my picks</button>':'')+'<button class="btn ghost sm" onclick="copyEditLink()">🔗 Copy edit link (other devices)</button></div>'):''}
     <p><b>🏆 Champion:</b> ${adv.champion?fa(adv.champion):'—'}</p>
     <p><b>🥈 Finalists:</b> ${tl(adv.F)}</p>
     <p><b>🥉 3rd place:</b> ${(e.bracket&&e.bracket['B'])?fa(e.bracket['B']):'—'}</p>
@@ -706,6 +707,7 @@ function loadEntryIntoForm(e){
   recomputeQualifiers();recomputeBracket();applyAll();saveDraft();
 }
 function editMyPicks(){const e=state.entries[state.myId];if(e)loadEntryIntoForm(e);closeModal();switchTab('picks');}
+function copyEditLink(){if(!state.myId)return;const u=location.origin+location.pathname+'?g='+GROUPKEY+'&me='+state.myId;try{navigator.clipboard.writeText(u);}catch(e){}window.prompt('Open this link on your phone (or any device) to edit your entry — it identifies your entry across devices:',u);}
 
 /* =========================== LIVE RESULTS =========================== */
 function renderResults(){
@@ -852,8 +854,10 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
   $('#poolPill').textContent='🏷️ '+(GROUPLABEL+' pool');
   document.title='WC 2026 Pick\'em'+(' — '+GROUPLABEL);
   buildGroups();
+  if(ME)localStorage.setItem('wc_my_id_'+STOREKEY,ME);
   loadDraft();recomputeQualifiers();applyAll();
-  Store.onEntries(d=>{state.entries=d||{};renderBoard();});
+  let _meLoaded=false;
+  Store.onEntries(d=>{state.entries=d||{};renderBoard();if(ME&&!_meLoaded&&state.entries[state.myId]){_meLoaded=true;loadEntryIntoForm(state.entries[state.myId]);switchTab('picks');}});
   await Store.init();setModeBanner();
   tickClock();setInterval(tickClock,1000);
   fetchLive();setInterval(fetchLive,CONFIG.pollMs);
