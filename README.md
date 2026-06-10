@@ -19,8 +19,8 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 2. Enter your display name.
 3. Enter a **predicted score** for **every** group match (required; use 🎲 *Fill
    match blanks* if you're in a hurry). Your group table updates live.
-4. Confirm each group's **1st & 2nd**, then choose the **8 wild cards** — the
-   third-placed teams you think grab the last 8 Round-of-32 spots.
+4. Your group **1st & 2nd** and the **8 wild cards** (best 3rd-placed teams)
+   are filled in **automatically** from your scores.
 5. Fill the **knockout bracket** by entering a **score** for every tie (higher
    score advances; ⚡ *Auto-fill* favours higher seeds), up to the champion.
 6. Hit **Submit**. The first person to submit **creates the pool** and gets an
