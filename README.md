@@ -22,7 +22,9 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 4. Your group **1st & 2nd** and the **8 wild cards** (best 3rd-placed teams)
    are filled in **automatically** from your scores.
 5. Fill the **knockout bracket** by entering a **score** for every tie (higher
-   score advances; ⚡ *Auto-fill* favours higher seeds), up to the champion.
+   score advances; ⚡ *Auto-fill* favours higher seeds), up to the champion —
+   including the **3rd-place playoff**. If a tie is level, pick the **penalty
+   shootout** winner.
 6. Hit **Submit**. The first person to submit **creates the pool** and gets an
    **invite link** (with its own QR code) — share it so everyone lands on the
    **same live leaderboard**.
@@ -40,7 +42,12 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 | **Exact knockout tie** (both teams meet + you pick the winner) | **+3** bonus |
 | **Maximum** | **563** |
 
-Score entry is **mandatory** for all 72 group matches and all 31 knockout ties.
+Score entry is **mandatory** for all 72 group matches and all 32 knockout ties
+(Round of 32 → Final, plus the 3rd-place playoff).
+
+**Penalty rule:** In knockout matches, if scores are level after 90 minutes and
+extra time, the winner is determined by a penalty shootout. For scoring in this
+pool, a penalty win counts as an extra **+1 goal** for the winning team.
 
 Knockouts are scored two ways at once: points for each of your teams that actually
 reaches a round (progression), **plus** a bonus whenever a tie you predicted really
