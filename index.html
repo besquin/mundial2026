@@ -688,7 +688,7 @@ function showEntry(id){
   }
   const adv=bracketAdvancers(e);const tl=a=>(a&&a.length)?a.map(fa).join(' · '):'—';
   body.innerHTML=`<h3>${escapeHtml(e.name||'Entry')}${id===state.myId?' (you)':''}</h3>
-    ${(id===state.myId&&!isLocked())?'<button class="btn sm" style="margin-bottom:8px" onclick="closeModal();switchTab(\'picks\')">✏️ Edit my picks</button>':''}
+    ${(id===state.myId&&!isLocked())?'<button class="btn sm" style="margin-bottom:8px" onclick="editMyPicks()">✏️ Edit my picks</button>':''}
     <p><b>🏆 Champion:</b> ${adv.champion?fa(adv.champion):'—'}</p>
     <p><b>🥈 Finalists:</b> ${tl(adv.F)}</p>
     <p><b>🥉 3rd place:</b> ${(e.bracket&&e.bracket['B'])?fa(e.bracket['B']):'—'}</p>
@@ -701,6 +701,17 @@ function showEntry(id){
     <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Group match scores</summary>${GLETTERS.map(g=>'<div style="margin-top:8px"><b>Group '+g+'</b></div>'+MATCHES.filter(m=>m.group===g).map(m=>{const s=e.scores&&e.scores[m.id];return `<div class="muted" style="font-size:12px">${fa(m.home)} <b>${s?s.h+'–'+s.a:'·'}</b> ${fa(m.away)}</div>`;}).join('')).join('')}</details>`;
   $('#entryModal').classList.remove('hide');
 }
+function loadEntryIntoForm(e){
+  if(!e)return;
+  $('#playerName').value=e.name||'';
+  state.scores=e.scores||{};
+  state.picks={};Object.keys(state.scores).forEach(id=>{const s=state.scores[id];state.picks[id]=deriveOutcome(s.h,s.a);});
+  state.wildcards=(e.wildcards||[]).slice(0,8);
+  state.koScores=e.koScores||{};
+  state.koPens=e.koPens||{};
+  recomputeQualifiers();recomputeBracket();applyAll();saveDraft();
+}
+function editMyPicks(){const e=state.entries[state.myId];if(e)loadEntryIntoForm(e);closeModal();switchTab('picks');}
 
 /* =========================== LIVE RESULTS =========================== */
 function renderResults(){
@@ -790,7 +801,7 @@ async function fetchLive(){
 function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$('#tab-picks').classList.toggle('hide',name!=='picks');$('#tab-board').classList.toggle('hide',name!=='board');$('#tab-results').classList.toggle('hide',name!=='results');if(name!=='picks')fetchLive();}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('#refreshNow').onclick=fetchLive;
-$('#editEntry').onclick=()=>switchTab('picks');
+$('#editEntry').onclick=editMyPicks;
 $('#modalClose').onclick=closeModal;
 $('#entryModal').onclick=e=>{if(e.target.id==='entryModal')closeModal();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
