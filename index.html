@@ -312,7 +312,7 @@
 
   <div id="entryModal" class="modal hide"><div class="modalbox"><button class="modalx" id="modalClose">✕</button><div id="modalBody"></div></div></div>
 
-  <p class="foot">Made for friends • Group draw &amp; opener per the official FIFA 2026 final draw • Bracket is a representative seeding • Results via live sports feed • Not affiliated with FIFA</p>
+  <p class="foot">Made for friends • Group draw &amp; opener per the official FIFA 2026 final draw • Bracket follows the official FIFA 2026 knockout structure • Results via live sports feed • Not affiliated with FIFA</p>
 </div>
 
 <script>
@@ -370,22 +370,27 @@ for(const g of Object.keys(GROUPS)){
 const ALL_TEAMS=Object.values(TEAM);
 const GLETTERS=Object.keys(GROUPS);
 
-/* bracket template — seeded from each player's own predicted standings */
-const R32=[
-  ['1A','T1'],['1B','T2'],['1C','T3'],['1D','T4'],
-  ['1E','T5'],['1F','T6'],['1G','T7'],['1H','T8'],
-  ['1I','2J'],['1J','2I'],['1K','2L'],['1L','2K'],
-  ['2A','2B'],['2C','2D'],['2E','2F'],['2G','2H']
-];
-const KO=[]; R32.forEach((p,i)=>KO.push({id:'K'+(i+1),round:'R32',a:{seed:p[0]},b:{seed:p[1]}}));
-function _add(prev,round){const ids=[];for(let i=0;i<prev.length;i+=2){const id='K'+(KO.length+1);KO.push({id,round,a:{match:prev[i]},b:{match:prev[i+1]}});ids.push(id);}return ids;}
-const R32IDS=KO.map(m=>m.id);
-const R16IDS=_add(R32IDS,'R16');
-const QFIDS=_add(R16IDS,'QF');
-const SFIDS=_add(QFIDS,'SF');
-const FINID=_add(SFIDS,'F')[0];
-KO.push({id:'B',round:'3P',a:{loser:SFIDS[0]},b:{loser:SFIDS[1]}}); // 3rd-place playoff (SF losers)
-const BRONZEID='B';
+/* OFFICIAL 2026 knockout bracket (FIFA). Third-placed slots accept a 3rd from the listed groups. */
+const THIRD_GROUPS={'3a':'ABCDF','3b':'CDFGH','3c':'CEFHI','3d':'EHIJK','3e':'BEFIJ','3f':'AEHIJ','3g':'EFGIJ','3h':'DEIJL'};
+const THIRD_SLOTS=Object.keys(THIRD_GROUPS).map(tok=>({tok,groups:THIRD_GROUPS[tok]}));
+const KO=[];
+[['M74','1E','3a'],['M77','1I','3b'],['M73','2A','2B'],['M75','1F','2C'],['M83','2K','2L'],['M84','1H','2J'],['M81','1D','3e'],['M82','1G','3f'],
+ ['M76','1C','2F'],['M78','2E','2I'],['M79','1A','3c'],['M80','1L','3d'],['M86','1J','2H'],['M88','2D','2G'],['M85','1B','3g'],['M87','1K','3h']]
+  .forEach(([id,a,b])=>KO.push({id,round:'R32',a:{seed:a},b:{seed:b}}));
+[['M89','M74','M77'],['M90','M73','M75'],['M93','M83','M84'],['M94','M81','M82'],['M91','M76','M78'],['M92','M79','M80'],['M95','M86','M88'],['M96','M85','M87']]
+  .forEach(([id,a,b])=>KO.push({id,round:'R16',a:{match:a},b:{match:b}}));
+[['M97','M89','M90'],['M98','M93','M94'],['M99','M91','M92'],['M100','M95','M96']]
+  .forEach(([id,a,b])=>KO.push({id,round:'QF',a:{match:a},b:{match:b}}));
+[['M101','M97','M98'],['M102','M99','M100']]
+  .forEach(([id,a,b])=>KO.push({id,round:'SF',a:{match:a},b:{match:b}}));
+KO.push({id:'M104',round:'F',a:{match:'M101'},b:{match:'M102'}});
+KO.push({id:'M103',round:'3P',a:{loser:'M101'},b:{loser:'M102'}}); // 3rd-place playoff (SF losers)
+const R32IDS=['M74','M77','M73','M75','M83','M84','M81','M82','M76','M78','M79','M80','M86','M88','M85','M87'];
+const R16IDS=['M89','M90','M93','M94','M91','M92','M95','M96'];
+const QFIDS=['M97','M98','M99','M100'];
+const SFIDS=['M101','M102'];
+const FINID='M104';
+const BRONZEID='M103';
 const KOBYID={}; KO.forEach(m=>KOBYID[m.id]=m);
 const KO_ROUNDS=[
   {key:'R32',label:'Round of 32',ids:R32IDS,pts:0},
@@ -394,7 +399,17 @@ const KO_ROUNDS=[
   {key:'SF',label:'Semi-finals',ids:SFIDS,pts:CONFIG.scoring.sf},
   {key:'F',label:'Final',ids:[FINID],pts:CONFIG.scoring.finalist}
 ];
-const TOTAL_TIES=KO.length; // 31
+const TOTAL_TIES=KO.length; // 32 (incl. 3rd-place)
+function assignThirds(wc){
+  wc=(wc||[]).filter(Boolean);
+  const grp=wc.map(c=>TEAMGROUP[c]||'');
+  const n=THIRD_SLOTS.length, ms=new Array(n).fill(-1), mw=new Array(wc.length).fill(-1);
+  const ok=(s,j)=>grp[j] && THIRD_SLOTS[s].groups.indexOf(grp[j])>=0;
+  function aug(s,seen){for(let j=0;j<wc.length;j++){if(ok(s,j)&&!seen[j]){seen[j]=true;if(mw[j]<0||aug(mw[j],seen)){ms[s]=j;mw[j]=s;return true;}}}return false;}
+  for(let s=0;s<n;s++)aug(s,new Array(wc.length).fill(false));
+  const map={}; THIRD_SLOTS.forEach((s,i)=>{map[s.tok]=ms[i]>=0?wc[ms[i]]:null;});
+  return map;
+}
 
 /* name -> code resolver */
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
@@ -480,7 +495,7 @@ function tableFromScores(scores){
 function seedMap(){
   const m={};
   GLETTERS.forEach(g=>{m['1'+g]=state.groupPicks[g]?state.groupPicks[g].first:null;m['2'+g]=state.groupPicks[g]?state.groupPicks[g].second:null;});
-  (state.wildcards||[]).forEach((c,i)=>m['T'+(i+1)]=c);
+  Object.assign(m,assignThirds(state.wildcards||[]));
   return m;
 }
 function koCode(side,sm){if(side.seed)return sm[side.seed]||null;if(side.loser)return koLoser(side.loser,sm);return state.bracket[side.match]||null;}
@@ -490,7 +505,7 @@ function bracketAdvancers(entry){
   const w=entry.bracket||{};const win=ids=>ids.map(id=>w[id]).filter(Boolean);
   return{R16:win(R32IDS),QF:win(R16IDS),SF:win(QFIDS),F:win(SFIDS),champion:w[FINID]||null};
 }
-function seedMapFor(e){const m={};GLETTERS.forEach(g=>{const gp=(e.groupPicks&&e.groupPicks[g])||{};m['1'+g]=gp.first||null;m['2'+g]=gp.second||null;});(e.wildcards||[]).forEach((c,i)=>m['T'+(i+1)]=c);return m;}
+function seedMapFor(e){const m={};GLETTERS.forEach(g=>{const gp=(e.groupPicks&&e.groupPicks[g])||{};m['1'+g]=gp.first||null;m['2'+g]=gp.second||null;});Object.assign(m,assignThirds(e.wildcards||[]));return m;}
 function koCodeFor(e,side,sm){if(side.seed)return sm[side.seed]||null;if(side.loser)return koLoserFor(e,side.loser,sm);return (e.bracket||{})[side.match]||null;}
 function koLoserFor(e,mid,sm){const m=KOBYID[mid];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm),w=(e.bracket||{})[mid];if(!a||!b||!w)return null;return w===a?b:a;}
 function predictedTies(e){const sm=seedMapFor(e);const ties=[];for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);const w=(e.bracket||{})[m.id];if(a&&b&&w)ties.push({pair:[a,b].sort().join('|'),winner:w});}return ties;}
@@ -626,7 +641,7 @@ function renderBracket(){
   if(_afId){const e=document.getElementById(_afId);if(e)e.focus();}
   refreshSummary();
 }
-function seedLabel(ref){if(ref[0]==='T')return '3rd #'+ref.slice(1);return (ref[0]==='1'?'Winner ':'Runner-up ')+'Grp '+ref.slice(1);}
+function seedLabel(ref){if(THIRD_GROUPS[ref])return '3rd ('+THIRD_GROUPS[ref].split('').join('/')+')';return (ref[0]==='1'?'Winner ':'Runner-up ')+'Grp '+ref.slice(1);}
 function autoFillBracket(){
   if(isLocked())return;const str=seedStrength();
   for(const m of KO){recomputeBracket();const sm=seedMap();const a=koCode(m.a,sm),b=koCode(m.b,sm);if(!a||!b)continue;const ex=state.koScores[m.id];if(ex&&Number.isFinite(ex.h)&&Number.isFinite(ex.a)&&ex.h!==ex.a)continue;const sa=str[a]||0,sb=str[b]||0;state.koScores[m.id]=(sb>sa)?{h:1,a:2}:{h:2,a:1};}
