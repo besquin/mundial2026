@@ -5,10 +5,10 @@ Predict all **72 group-stage matches** and the **8 wild cards**, submit your
 entry, and watch the **live leaderboard** — results are pulled and scored
 **automatically**. No one ever types in a score.
 
-**Live app:** https://besquin.github.io/worldcup/
+**Live app:** https://besquin.github.io/ribosmundial2026/
 
 <p align="center">
-  <img src="worldcup-qr.png" alt="QR code to the live app" width="240">
+  <img src="ribosmundial2026-qr.png" alt="QR code to the live app" width="240">
   <br><em>Scan to open the app</em>
 </p>
 
@@ -50,7 +50,7 @@ GitHub Pages must be switched on once by the repo owner:
 1. Go to **Settings → Pages**.
 2. **Build and deployment → Source:** *Deploy from a branch.*
 3. **Branch:** `claude/charming-goodall-mjos84`, **folder:** `/ (root)` → **Save.**
-4. Wait ~1 minute → live at https://besquin.github.io/worldcup/
+4. Wait ~1 minute → live at https://besquin.github.io/ribosmundial2026/
 
 ## Configuration
 All settings live in the `CONFIG` block near the top of the `<script>` in
