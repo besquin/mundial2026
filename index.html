@@ -207,7 +207,9 @@
       <h2>👤 Your name</h2>
       <p class="muted">This is how your entry shows up on the leaderboard — make it unique (e.g. add an emoji) so friends can tell entries apart. <b>Editing on a different device?</b> Type the same name and tap <b>Load my entry</b>.</p>
       <input type="text" id="playerName" placeholder="Enter your name… e.g. Alex 🐐" maxlength="28" autocomplete="off"/>
-      <div class="btnrow" style="margin-top:8px"><button class="btn ghost sm" id="loadMine">↻ Load my entry</button></div>
+      <label class="fld" for="playerPin" style="margin:10px 0 6px">🔒 Secret PIN — protects your entry; you'll need it to edit from another device. Don't share it.</label>
+      <input type="text" id="playerPin" inputmode="numeric" maxlength="10" placeholder="e.g. 4729" autocomplete="off" style="max-width:180px"/>
+      <div class="btnrow" style="margin-top:10px"><button class="btn ghost sm" id="loadMine">↻ Load my entry</button></div>
       <p class="muted" id="loadMineMsg" style="margin:6px 0 0"></p>
     </div>
     <div class="card" id="rulesCard">
@@ -711,11 +713,18 @@ function loadEntryIntoForm(e){
 function editMyPicks(){const e=state.entries[state.myId];if(e)loadEntryIntoForm(e);closeModal();switchTab('picks');}
 function nameKey(s){return String(s||'').trim().toLowerCase();}
 function findEntryIdByName(nm){const k=nameKey(nm);if(!k)return null;return Object.keys(state.entries).find(id=>nameKey(state.entries[id].name)===k)||null;}
+function hashPin(p){p=String(p||'');let h=5381;for(let i=0;i<p.length;i++)h=((h<<5)+h+p.charCodeAt(i))>>>0;return 'p'+h.toString(36);}
+function ownsLocally(id){return !!id&&(localStorage.getItem('wc_my_id_'+STOREKEY)===id||(ISDEFAULT&&localStorage.getItem('wc_my_id')===id));}
 function loadMyEntryByName(){
   const id=findEntryIdByName($('#playerName').value);
   if(!id){$('#loadMineMsg').textContent='No entry found with that name yet. Type your exact name (as submitted), then tap Load.';return;}
+  const ex=state.entries[id];
+  if(!ownsLocally(id)){
+    if(ex.pinHash){ if(hashPin($('#playerPin').value.trim())!==ex.pinHash){$('#loadMineMsg').textContent='🔒 Wrong PIN — enter the PIN you set for this name, then tap Load.';return;} }
+    else { $('#loadMineMsg').textContent='🔒 This entry has no PIN and can only be edited on the device that created it.';return; }
+  }
   state.myId=id;localStorage.setItem('wc_my_id_'+STOREKEY,id);
-  loadEntryIntoForm(state.entries[id]);
+  loadEntryIntoForm(ex);
   $('#loadMineMsg').textContent='✅ Loaded your entry — make changes and Submit to update it.';
 }
 function copyEditLink(){if(!state.myId)return;const u=location.origin+location.pathname+'?g='+GROUPKEY+'&me='+state.myId;try{navigator.clipboard.writeText(u);}catch(e){}window.prompt('Open this link on your phone (or any device) to edit your entry — it identifies your entry across devices:',u);}
@@ -829,12 +838,21 @@ function dec(code){return JSON.parse(decodeURIComponent(escape(atob(code.trim())
 $('#submitBtn').onclick=async()=>{
   if(isLocked())return;const name=$('#playerName').value.trim();if(!name)return;
   if(Object.keys(state.scores).length!==MATCHES.length||state.wildcards.length!==8||Object.keys(state.bracket).length!==TOTAL_TIES)return;
-  const byName=findEntryIdByName(name); if(byName) state.myId=byName;   // same name = same entry across devices
-  if(!state.myId)state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  const pin=$('#playerPin').value.trim();
+  const byName=findEntryIdByName(name);
+  if(byName && !ownsLocally(byName)){              // editing an entry created on another device
+    const ex=state.entries[byName];
+    if(ex && ex.pinHash){ if(hashPin(pin)!==ex.pinHash){$('#submitMsg').textContent='🔒 Wrong PIN for “'+name+'”. Enter the PIN set for that entry, or use a different name.';return;} }
+    else { $('#submitMsg').textContent='🔒 The name “'+name+'” is already taken. Use a different name (or edit it on its original device).';return; }
+  }
+  if(byName) state.myId=byName;
+  if(!state.myId){ if(pin.length<3){$('#submitMsg').textContent='🔒 Choose a PIN (3+ characters) to protect your entry, then Submit.';$('#playerPin').focus();return;} state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   localStorage.setItem('wc_my_id_'+STOREKEY,state.myId);
+  if(pin)localStorage.setItem('wc_pin_'+STOREKEY,pin);
   const existing=state.entries[state.myId];
   recomputeQualifiers();recomputeBracket();
-  const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,koPens:state.koPens,bracket:state.bracket,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
+  const pinHash = pin ? hashPin(pin) : ((existing&&existing.pinHash)||null);
+  const entry={name,picks:state.picks,scores:state.scores,groupPicks:state.groupPicks,wildcards:state.wildcards,koScores:state.koScores,koPens:state.koPens,bracket:state.bracket,pinHash,createdAt:(existing&&existing.createdAt)||Date.now(),updatedAt:Date.now()};
   const hadPool=!!Store.poolId;$('#submitBtn').disabled=true;$('#submitMsg').textContent='Saving…';
   try{await Store.saveEntry(state.myId,entry);setModeBanner();if(!hadPool&&Store.poolId){$('#submitMsg').textContent='✅ Saved & pool created! Copy your invite link above. 🎉';$('#shareCard').scrollIntoView({behavior:'smooth',block:'center'});}else{$('#submitMsg').textContent='✅ Entry saved! Switching to leaderboard…';setTimeout(()=>switchTab('board'),700);}$('#submitBtn').disabled=false;}
   catch(e){$('#submitMsg').textContent='⚠️ Could not save: '+e.message;$('#submitBtn').disabled=false;}
@@ -869,7 +887,7 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
   document.title='WC 2026 Pick\'em'+(' — '+GROUPLABEL);
   buildGroups();
   if(ME)localStorage.setItem('wc_my_id_'+STOREKEY,ME);
-  loadDraft();recomputeQualifiers();applyAll();
+  loadDraft();$('#playerPin').value=localStorage.getItem('wc_pin_'+STOREKEY)||'';recomputeQualifiers();applyAll();
   let _meLoaded=false;
   Store.onEntries(d=>{state.entries=d||{};renderBoard();if(ME&&!_meLoaded&&state.entries[state.myId]){_meLoaded=true;loadEntryIntoForm(state.entries[state.myId]);switchTab('picks');}});
   await Store.init();setModeBanner();
