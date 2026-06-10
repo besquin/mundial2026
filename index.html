@@ -531,12 +531,13 @@ function brow(id,code,side,key,val,w,aw,editable){
   const lbl=code?fa(code):(side.seed?seedLabel(side.seed):'Winner '+side.match);
   const row=el('div','bteam'+(code?'':' empty')+(w&&w===code?' win':'')+(w&&w===code&&aw&&aw===code?' correct':''));
   row.appendChild(el('span',null,escapeHtml(lbl)));
-  if(code&&editable){const inp=el('input');inp.type='number';inp.min=0;inp.className='bgin';inp.id='ks-'+id+'-'+key;if(val!=null)inp.value=val;inp.setAttribute('inputmode','numeric');inp.onchange=()=>onKoScore(id);row.appendChild(inp);}
+  if(code&&editable){const inp=el('input');inp.type='number';inp.min=0;inp.className='bgin';inp.id='ks-'+id+'-'+key;if(val!=null)inp.value=val;inp.setAttribute('inputmode','numeric');inp.oninput=()=>{storeKoScore(id);recomputeBracket();saveDraft();};inp.onchange=()=>{storeKoScore(id);recomputeBracket();saveDraft();renderBracket();};row.appendChild(inp);}
   else row.appendChild(el('span','res',val!=null?val:''));
   return row;
 }
-function onKoScore(id){const h=$('#ks-'+id+'-h').value,a=$('#ks-'+id+'-a').value;if(h!==''&&a!==''&&Number(h)>=0&&Number(a)>=0)state.koScores[id]={h:Number(h),a:Number(a)};else delete state.koScores[id];recomputeBracket();renderBracket();saveDraft();}
+function storeKoScore(id){const hv=$('#ks-'+id+'-h'),av=$('#ks-'+id+'-a');if(!hv||!av)return;const sc={};if(hv.value!==''&&Number(hv.value)>=0)sc.h=Number(hv.value);if(av.value!==''&&Number(av.value)>=0)sc.a=Number(av.value);if(sc.h!=null||sc.a!=null)state.koScores[id]=sc;else delete state.koScores[id];}
 function renderBracket(){
+  const _afId=(document.activeElement&&document.activeElement.id&&document.activeElement.id.indexOf('ks-')===0)?document.activeElement.id:null;
   recomputeBracket();
   const sm=seedMap();const wrap=$('#bracket');if(!wrap)return;wrap.innerHTML='';
   const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
@@ -562,6 +563,7 @@ function renderBracket(){
     wrap.appendChild(col);
   });
   const champ=state.bracket[FINID];const cb=el('div','champbox');cb.appendChild(el('h4',null,'Champion'));cb.appendChild(el('div','champ'+(champ?'':' empty'),champ?('🏆 '+fa(champ)):'🏆 —'));wrap.appendChild(cb);
+  if(_afId){const e=document.getElementById(_afId);if(e)e.focus();}
   refreshSummary();
 }
 function seedLabel(ref){if(ref[0]==='T')return '3rd #'+ref.slice(1);return (ref[0]==='1'?'Winner ':'Runner-up ')+'Grp '+ref.slice(1);}
