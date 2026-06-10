@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>World Cup 2026 — Pick'em Pool ⚽</title>
-<meta name="description" content="Predict every 2026 World Cup group-stage match and the 8 wild cards. Submit your entry and watch the live leaderboard." />
+<meta name="description" content="Predict every 2026 World Cup group-stage match and the 8 wild cards. Results are scored automatically and the leaderboard updates live." />
 <style>
   :root{
     --bg:#0b1020; --bg2:#111935; --card:#161f3d; --card2:#1d2950;
@@ -30,14 +30,12 @@
   .pill{display:inline-flex;align-items:center;gap:6px;background:var(--card);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--mut)}
 
-  /* status / countdown */
   .statusbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:14px 0}
   .clock{font-variant-numeric:tabular-nums;font-weight:700;color:var(--txt)}
-  .live-dot{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:pulse 1.8s infinite}
+  .live-dot{width:9px;height:9px;border-radius:50%;background:var(--acc);animation:pulse 1.8s infinite}
   .live-dot.off{background:#64748b;animation:none}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 10px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 
-  /* tabs */
   .tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);
     border-radius:999px;padding:6px;margin:8px auto 20px;max-width:560px}
   .tab{flex:1;text-align:center;padding:10px 8px;border-radius:999px;cursor:pointer;
@@ -56,8 +54,7 @@
   .banner.locked{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35);color:#fecaca}
 
   label.fld{display:block;font-size:13px;color:var(--mut);margin:0 0 6px}
-  input[type=text],input[type=password]{
-    width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--txt);
+  input[type=text]{width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--txt);
     border-radius:10px;padding:11px 12px;font-size:15px;outline:none}
   input:focus{border-color:var(--acc)}
 
@@ -69,7 +66,6 @@
   .btn.sm{padding:8px 12px;font-size:13px}
   .btnrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 
-  /* group cards */
   .group{margin:12px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card2)}
   .group-head{display:flex;align-items:center;justify-content:space-between;
     padding:11px 14px;background:linear-gradient(90deg,rgba(34,197,94,.14),transparent);cursor:pointer}
@@ -81,7 +77,7 @@
   .match:first-child{border-top:none}
   .teams{font-size:14px}
   .teams .vs{color:var(--mut);margin:0 6px;font-size:12px}
-  .res-chip{font-size:11px;color:var(--mut);margin-left:8px;background:var(--bg2);
+  .res-chip{display:inline-block;font-size:11px;color:var(--mut);margin-left:8px;background:var(--bg2);
     border:1px solid var(--line);border-radius:6px;padding:1px 6px}
   .res-chip.hit{color:#bbf7d0;border-color:rgba(34,197,94,.4)}
   .res-chip.miss{color:#fecaca;border-color:rgba(239,68,68,.4)}
@@ -90,15 +86,14 @@
   select:focus{border-color:var(--acc)}
   select.picked{border-color:rgba(34,197,94,.5)}
 
-  /* wildcard chips */
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg2);
     border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer;user-select:none;transition:.12s}
   .chip:hover{border-color:var(--mut)}
   .chip.on{background:linear-gradient(180deg,var(--gold),#d97706);color:#241300;border-color:transparent;font-weight:700}
   .chip.win{outline:2px solid var(--acc)}
+  .chip.ro{cursor:default}
 
-  /* progress */
   .progress{height:10px;background:var(--bg2);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
   .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--gold));width:0;transition:width .25s}
   .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px}
@@ -106,15 +101,16 @@
   .stat b{display:block;font-size:22px}
   .stat span{font-size:12px;color:var(--mut)}
 
-  /* leaderboard */
   table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
   th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   tr.me{background:rgba(34,197,94,.08)}
   .rank{font-weight:800;color:var(--gold)}
   .total{font-weight:800;color:var(--acc)}
   .empty{text-align:center;color:var(--mut);padding:30px 10px}
+  .qual{color:#bbf7d0} .wild{color:var(--gold)}
+  .stbl td:first-child{width:26px;color:var(--mut)}
 
   .sticky-submit{position:sticky;bottom:0;left:0;right:0;background:linear-gradient(180deg,transparent,var(--bg) 40%);
     padding:14px 0 6px;margin-top:8px;z-index:5}
@@ -123,21 +119,19 @@
   textarea{width:100%;min-height:90px;background:var(--bg2);border:1px solid var(--line);
     color:var(--txt);border-radius:10px;padding:10px;font-family:ui-monospace,monospace;font-size:12px}
   .foot{text-align:center;color:var(--mut);font-size:12px;margin-top:24px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .hide{display:none !important}
-  @media(max-width:560px){
-    .match{grid-template-columns:1fr}
-    select{width:100%}
-    .title{font-size:24px}
-  }
+  @media(max-width:640px){ .grid2{grid-template-columns:1fr} }
+  @media(max-width:560px){ .match{grid-template-columns:1fr} select{width:100%} .title{font-size:24px} }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <h1 class="title"><span class="ball">⚽</span> World Cup 2026 Pick'em</h1>
-    <p class="subtitle">Canada · Mexico · USA — Predict all 72 group matches + the 8 wild cards</p>
+    <p class="subtitle">Canada · Mexico · USA — Predict all 72 group matches + the 8 wild cards. Auto-scored, live.</p>
     <div class="statusbar">
-      <span class="pill"><span id="liveDot" class="live-dot off"></span><span id="liveText">Local mode</span></span>
+      <span class="pill"><span id="liveDot" class="live-dot off"></span><span id="liveText">Connecting…</span></span>
       <span class="pill">🔒 Picks lock in <span id="clock" class="clock">—</span></span>
       <span class="pill">👥 <span id="entryCount">0</span> players</span>
     </div>
@@ -146,17 +140,17 @@
   <div class="tabs">
     <button class="tab active" data-tab="picks">📝 Make Picks</button>
     <button class="tab" data-tab="board">🏆 Leaderboard</button>
-    <button class="tab" data-tab="admin">⚙️ Results</button>
+    <button class="tab" data-tab="results">📊 Live Results</button>
   </div>
 
   <!-- ================= PICKS ================= -->
   <section id="tab-picks">
-    <div id="lockBanner" class="banner locked hide">🔒 <b>Entries are locked.</b> The tournament has kicked off — head to the Leaderboard to follow live standings.</div>
+    <div id="lockBanner" class="banner locked hide">🔒 <b>Entries are locked.</b> The tournament has kicked off — results are now scored automatically. Head to the Leaderboard.</div>
     <div id="modeBanner" class="banner warn"></div>
 
     <div class="card">
       <h2>Your entry</h2>
-      <p class="muted">Enter your name, predict every match, choose 8 wild-card teams, then submit. You can edit until the lock.</p>
+      <p class="muted">Enter your name, predict every match, choose 8 wild-card teams, then submit. You can edit until the lock — after that everything scores automatically.</p>
       <label class="fld" for="playerName">Display name</label>
       <input type="text" id="playerName" placeholder="e.g. Alex 🐐" maxlength="28" autocomplete="off"/>
     </div>
@@ -191,8 +185,8 @@
         <ul class="muted">
           <li><b>+3 pts</b> for each correct group-match result (home win / draw / away win).</li>
           <li><b>+5 pts</b> for each correct wild-card team (a 3rd-placed side that advances).</li>
-          <li>Max possible: 72×3 + 8×5 = <b>256 points</b>.</li>
-          <li>Ties broken by total correct picks, then earliest submission.</li>
+          <li>Results are pulled automatically from a live feed — no one enters scores by hand.</li>
+          <li>Max possible: 72×3 + 8×5 = <b>256 points</b>. Ties broken by total correct picks, then earliest submission.</li>
         </ul>
       </details>
     </div>
@@ -223,41 +217,35 @@
   <section id="tab-board" class="hide">
     <div class="card">
       <h2>🏆 Live leaderboard</h2>
-      <p class="muted" id="boardMeta">No results entered yet — standings show 0 until matches are scored.</p>
+      <p class="muted" id="boardMeta">Standings update automatically as results come in.</p>
       <div id="board"></div>
     </div>
+  </section>
+
+  <!-- ================= LIVE RESULTS ================= -->
+  <section id="tab-results" class="hide">
     <div class="card">
-      <h2>Tournament progress</h2>
-      <div class="progress"><i id="resProg"></i></div>
-      <p class="muted" id="resProgTxt" style="margin-top:8px">0 / 72 matches scored · 0 / 8 wild cards set</p>
+      <h2>📊 Live results <span class="muted">— pulled automatically</span></h2>
+      <div class="btnrow" style="justify-content:space-between">
+        <p class="muted" id="resStatus" style="margin:6px 0">Loading live feed…</p>
+        <button class="btn ghost sm" id="refreshNow">↻ Refresh now</button>
+      </div>
+      <div class="progress" style="margin-top:6px"><i id="resProg"></i></div>
+      <p class="muted" id="resProgTxt" style="margin-top:8px">0 / 72 matches played</p>
+    </div>
+    <div class="card">
+      <h2>Group standings</h2>
+      <p class="muted">Top 2 (green) qualify directly · best 8 third-placed teams (gold) take the wild-card spots.</p>
+      <div id="standings" class="grid2"></div>
+    </div>
+    <div class="card">
+      <h2>Wild-card tracker</h2>
+      <p class="muted" id="wcTrackNote">The 8 best third-placed teams currently projected to advance:</p>
+      <div id="wcTrack" class="chips"></div>
     </div>
   </section>
 
-  <!-- ================= ADMIN / RESULTS ================= -->
-  <section id="tab-admin" class="hide">
-    <div class="card" id="adminGate">
-      <h2>⚙️ Commissioner — enter results</h2>
-      <p class="muted">Enter the real outcomes here as the tournament unfolds. Everyone's scores update live. Protected by a passcode.</p>
-      <label class="fld" for="adminPass">Passcode</label>
-      <input type="password" id="adminPass" placeholder="Enter commissioner passcode"/>
-      <div class="btnrow" style="margin-top:10px"><button class="btn sm" id="adminUnlock">Unlock</button></div>
-      <p id="adminMsg" class="muted"></p>
-    </div>
-    <div id="adminPanel" class="hide">
-      <div class="banner ok">🔓 Commissioner mode. Changes save instantly and update everyone's standings.</div>
-      <div class="card">
-        <h2>Match results</h2>
-        <div id="adminGroups"></div>
-      </div>
-      <div class="card">
-        <h2>Wild-card qualifiers <span class="muted">(pick the 8 that advanced)</span></h2>
-        <div style="margin:8px 0"><span class="pill">Set: <b id="awcCount" style="margin-left:4px">0</b>/8</span></div>
-        <div id="adminWild" class="chips"></div>
-      </div>
-    </div>
-  </section>
-
-  <p class="foot">Made for friends • Group draw &amp; opener (Mexico v South Africa) per the official FIFA 2026 final draw • Not affiliated with FIFA</p>
+  <p class="foot">Made for friends • Group draw &amp; opener (Mexico v South Africa) per the official FIFA 2026 final draw • Results via live sports feed • Not affiliated with FIFA</p>
 </div>
 
 <script>
@@ -266,12 +254,16 @@
    ========================================================================= */
 const CONFIG = {
   // Entries lock 1 hour before the opening match (Mexico v South Africa, Estadio Azteca).
-  // Opener kickoff and lock time (Mexico City is UTC-6, no DST). Adjust if needed.
+  // Mexico City is UTC-6 (no DST). Adjust if the kickoff time differs.
   openerISO: "2026-06-11T20:00:00-06:00",
   lockISO:   "2026-06-11T19:00:00-06:00",
-  adminPass: "azteca2026",   // change this and share only with the commissioner
-  // PASTE your Firebase Realtime Database config below to turn on the LIVE shared
-  // leaderboard for everyone. Leave databaseURL empty to run in local mode.
+
+  // Live results are fetched from this endpoint (the bundled Vercel function).
+  resultsEndpoint: "/api/results",
+  pollMs: 60000,
+
+  // PASTE your Firebase Realtime Database config below to share ONE leaderboard
+  // across all your friends. Leave databaseURL empty to run in local mode.
   firebase: {
     apiKey: "",
     authDomain: "",
@@ -299,49 +291,67 @@ const GROUPS = {
   K: [["POR","Portugal","🇵🇹"],["COL","Colombia","🇨🇴"],["COD","DR Congo","🇨🇩"],["UZB","Uzbekistan","🇺🇿"]],
   L: [["ENG","England","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],["CRO","Croatia","🇭🇷"],["GHA","Ghana","🇬🇭"],["PAN","Panama","🇵🇦"]]
 };
-// Round-robin pairing order (index into the group's 4 teams). A1 = Mexico v South Africa (opener).
-const RR = [[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]];
+const RR = [[0,1],[2,3],[0,2],[1,3],[0,3],[1,2]]; // A1 = Mexico v South Africa (opener)
 const MATCHES = [];
-const TEAM = {}; // code -> [code,name,flag]
+const TEAM = {};          // code -> [code,name,flag]
+const TEAMGROUP = {};     // code -> group letter
+const PAIR2MATCH = {};    // "CODE|CODE" (sorted) -> {id, home, away}
 for (const g of Object.keys(GROUPS)) {
-  GROUPS[g].forEach(t => TEAM[t[0]] = t);
-  RR.forEach((p,i) => MATCHES.push({ id: g + (i+1), group: g, home: GROUPS[g][p[0]], away: GROUPS[g][p[1]] }));
+  GROUPS[g].forEach(t => { TEAM[t[0]] = t; TEAMGROUP[t[0]] = g; });
+  RR.forEach((p,i) => {
+    const home = GROUPS[g][p[0]][0], away = GROUPS[g][p[1]][0], id = g + (i+1);
+    MATCHES.push({ id, group: g, home, away });
+    PAIR2MATCH[[home,away].sort().join("|")] = { id, home, away };
+  });
 }
 const ALL_TEAMS = Object.values(TEAM);
 const MAX_POINTS = MATCHES.length*3 + 8*5;
+
+/* name -> code resolver (for matching the live feed to our teams) */
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+const NAMEMAP = {};
+ALL_TEAMS.forEach(t => NAMEMAP[norm(t[1])] = t[0]);
+Object.assign(NAMEMAP, {
+  southkorea:"KOR", korearepublic:"KOR", korea:"KOR",
+  unitedstates:"USA", usa:"USA", us:"USA",
+  iran:"IRN", iriran:"IRN", islamicrepublicofiran:"IRN",
+  ivorycoast:"CIV", cotedivoire:"CIV",
+  turkiye:"TUR", turkey:"TUR",
+  czechia:"CZE", czechrepublic:"CZE",
+  capeverde:"CPV", caboverde:"CPV",
+  curacao:"CUW",
+  drcongo:"COD", congodr:"COD", democraticrepublicofthecongo:"COD", congodemocraticrepublic:"COD",
+  bosniaherz:"BIH", bosniaandherzegovina:"BIH", bosniaherzegovina:"BIH",
+  saudiarabia:"SAU", southafrica:"RSA", newzealand:"NZL", republicofireland:"IRL"
+});
+const codeOf = name => NAMEMAP[norm(name)] || null;
 
 /* =========================================================================
    STATE
    ========================================================================= */
 const state = {
-  picks: {},        // matchId -> 'home'|'draw'|'away'
-  wildcards: [],     // [code,...] up to 8
+  picks: {}, wildcards: [],
   myId: localStorage.getItem('wc_my_id') || null,
-  entries: {},       // id -> entry
-  results: { matches: {}, wildcards: [] },
-  mode: 'local',
-  admin: false
+  entries: {},
+  results: { matches:{}, wildcards:[] }, // effective (scored) results
+  standings: {},                          // group -> [{code,pts,gd,gf,p,pos}]
+  proj: [],                               // projected 8 wild-card codes
+  groupComplete: false,
+  feed: { source:"…", lastUpdated:null, played:0 },
+  cloud: false
 };
 
 /* =========================================================================
-   STORE — Firebase if configured, else localStorage (+ cross-tab sync)
+   STORE — Firebase (entries only) if configured, else localStorage
    ========================================================================= */
 const Store = (() => {
   const useFB = !!(CONFIG.firebase && CONFIG.firebase.databaseURL);
-  let db = null, refs = {};
-  const listeners = { entries: [], results: [] };
-  const emit = (k,v) => listeners[k].forEach(fn => fn(v));
-
-  // ---- local impl ----
-  const LK = { entries:'wc_entries', results:'wc_results' };
+  let db = null, fns = null;
+  const listeners = [];
+  const emit = v => listeners.forEach(fn => fn(v));
+  const LK = 'wc_entries';
   const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('wc26') : null;
-  function localLoad(){
-    return {
-      entries: JSON.parse(localStorage.getItem(LK.entries) || '{}'),
-      results: JSON.parse(localStorage.getItem(LK.results) || '{"matches":{},"wildcards":[]}')
-    };
-  }
-  function localBroadcast(){ if(bc) bc.postMessage('sync'); }
+  const localLoad = () => JSON.parse(localStorage.getItem(LK) || '{}');
 
   async function init(){
     if (useFB){
@@ -349,31 +359,23 @@ const Store = (() => {
         const appMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
         const dbMod  = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
         const app = appMod.initializeApp(CONFIG.firebase);
-        db = dbMod.getDatabase(app);
-        refs = { fns: dbMod };
-        dbMod.onValue(dbMod.ref(db,'entries'), s => emit('entries', s.val() || {}));
-        dbMod.onValue(dbMod.ref(db,'results'), s => emit('results', s.val() || {matches:{},wildcards:[]}));
+        db = dbMod.getDatabase(app); fns = dbMod;
+        dbMod.onValue(dbMod.ref(db,'entries'), s => emit(s.val() || {}));
         return 'cloud';
-      }catch(e){ console.warn('Firebase init failed, falling back to local', e); }
+      }catch(e){ console.warn('Firebase failed, local mode', e); }
     }
-    // local
-    const fire = () => { const d = localLoad(); emit('entries', d.entries); emit('results', d.results); };
+    const fire = () => emit(localLoad());
     window.addEventListener('storage', fire);
     if (bc) bc.onmessage = fire;
     setTimeout(fire, 0);
     return 'local';
   }
-  function onEntries(fn){ listeners.entries.push(fn); }
-  function onResults(fn){ listeners.results.push(fn); }
+  function onEntries(fn){ listeners.push(fn); }
   async function saveEntry(id, entry){
-    if (db){ await refs.fns.set(refs.fns.ref(db,'entries/'+id), entry); }
-    else { const d = localLoad(); d.entries[id] = entry; localStorage.setItem(LK.entries, JSON.stringify(d.entries)); emit('entries', d.entries); localBroadcast(); }
+    if (db){ await fns.set(fns.ref(db,'entries/'+id), entry); }
+    else { const d = localLoad(); d[id] = entry; localStorage.setItem(LK, JSON.stringify(d)); emit(d); if(bc) bc.postMessage('x'); }
   }
-  async function saveResults(results){
-    if (db){ await refs.fns.set(refs.fns.ref(db,'results'), results); }
-    else { localStorage.setItem(LK.results, JSON.stringify(results)); emit('results', results); localBroadcast(); }
-  }
-  return { init, onEntries, onResults, saveEntry, saveResults, get isCloud(){ return !!db; } };
+  return { init, onEntries, saveEntry, get isCloud(){ return !!db; } };
 })();
 
 /* =========================================================================
@@ -383,7 +385,6 @@ const $ = s => document.querySelector(s);
 const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e; };
 const lockTime = new Date(CONFIG.lockISO).getTime();
 const isLocked = () => Date.now() >= lockTime;
-function tname(code){ const t=TEAM[code]; return t ? t[2]+' '+t[1] : code; }
 
 function scoreEntry(entry){
   let gp=0,gc=0,wp=0,wc=0;
@@ -391,14 +392,9 @@ function scoreEntry(entry){
   for (const t of (entry.wildcards||[])){ if((state.results.wildcards||[]).includes(t)){wp+=5;wc++;} }
   return { groupPts:gp, groupCorrect:gc, wcPts:wp, wcCorrect:wc, total:gp+wp, correct:gc+wc };
 }
-function encodePicks(){
-  return btoa(unescape(encodeURIComponent(JSON.stringify({
-    name: $('#playerName').value.trim(), picks: state.picks, wildcards: state.wildcards, v:1
-  }))));
-}
-function decodePicks(code){
-  return JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
-}
+const enc = () => btoa(unescape(encodeURIComponent(JSON.stringify({ name:$('#playerName').value.trim(), picks:state.picks, wildcards:state.wildcards, v:2 }))));
+const dec = code => JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* =========================================================================
    RENDER — picks form
@@ -406,25 +402,22 @@ function decodePicks(code){
 function buildGroups(){
   const root = $('#groups'); root.innerHTML='';
   for (const g of Object.keys(GROUPS)){
-    const gms = MATCHES.filter(m=>m.group===g);
     const box = el('div','group');
-    const head = el('div','group-head',
-      `<h3>Group ${g}</h3><span class="gprog" id="gp-${g}">0/6</span>`);
+    const head = el('div','group-head', `<h3>Group ${g}</h3><span class="gprog" id="gp-${g}">0/6</span>`);
     const body = el('div','matches');
     head.onclick = () => body.classList.toggle('hide');
-    gms.forEach(m=>{
+    MATCHES.filter(m=>m.group===g).forEach(m=>{
+      const H=TEAM[m.home], A=TEAM[m.away];
       const row = el('div','match');
       row.appendChild(el('div','teams',
-        `${m.home[2]} ${m.home[1]} <span class="vs">vs</span> ${m.away[2]} ${m.away[1]}<span class="res-chip hide" id="rc-${m.id}"></span>`));
-      const sel = el('select');
-      sel.id = 'sel-'+m.id;
+        `${H[2]} ${H[1]} <span class="vs">vs</span> ${A[2]} ${A[1]}<span class="res-chip hide" id="rc-${m.id}"></span>`));
+      const sel = el('select'); sel.id='sel-'+m.id;
       sel.innerHTML = `<option value="">— pick —</option>
-        <option value="home">${m.home[2]} ${m.home[1]} win</option>
+        <option value="home">${H[2]} ${H[1]} win</option>
         <option value="draw">Draw</option>
-        <option value="away">${m.away[2]} ${m.away[1]} win</option>`;
-      sel.onchange = () => { if(sel.value) state.picks[m.id]=sel.value; else delete state.picks[m.id]; sel.classList.toggle('picked',!!sel.value); refreshSummary(); };
-      row.appendChild(sel);
-      body.appendChild(row);
+        <option value="away">${A[2]} ${A[1]} win</option>`;
+      sel.onchange = () => { if(sel.value) state.picks[m.id]=sel.value; else delete state.picks[m.id]; sel.classList.toggle('picked',!!sel.value); saveDraft(); };
+      row.appendChild(sel); body.appendChild(row);
     });
     box.appendChild(head); box.appendChild(body); root.appendChild(box);
   }
@@ -432,17 +425,16 @@ function buildGroups(){
 function buildWildcards(){
   const root = $('#wildcards'); root.innerHTML='';
   ALL_TEAMS.slice().sort((a,b)=>a[1].localeCompare(b[1])).forEach(t=>{
-    const c = el('div','chip',`${t[2]} ${t[1]}`);
-    c.dataset.code=t[0]; c.id='wc-'+t[0];
-    c.onclick = () => toggleWild(t[0]);
-    root.appendChild(c);
+    const c = el('div','chip',`${t[2]} ${t[1]}`); c.id='wc-'+t[0];
+    c.onclick = () => toggleWild(t[0]); root.appendChild(c);
   });
 }
 function toggleWild(code){
+  if (isLocked()) return;
   const i = state.wildcards.indexOf(code);
   if (i>=0) state.wildcards.splice(i,1);
   else { if (state.wildcards.length>=8){ flash($('#wcCount').parentElement,'Only 8 allowed'); return; } state.wildcards.push(code); }
-  syncWildUI(); refreshSummary();
+  syncWildUI(); saveDraft();
 }
 function syncWildUI(){
   ALL_TEAMS.forEach(t=>{ const c=$('#wc-'+t[0]); if(c) c.classList.toggle('on', state.wildcards.includes(t[0])); });
@@ -452,14 +444,12 @@ function refreshSummary(){
   const picked = Object.keys(state.picks).length;
   $('#sMatches').textContent = picked+'/'+MATCHES.length;
   $('#sWild').textContent = state.wildcards.length+'/8';
-  // per-group progress
   for (const g of Object.keys(GROUPS)){
     const n = MATCHES.filter(m=>m.group===g && state.picks[m.id]).length;
     const e=$('#gp-'+g); if(e) e.textContent = n+'/6';
   }
   const frac = (picked + Math.min(state.wildcards.length,8)) / (MATCHES.length+8);
   $('#progBar').style.width = (frac*100).toFixed(1)+'%';
-  // live score (if any results)
   const hasRes = Object.keys(state.results.matches).length || (state.results.wildcards||[]).length;
   $('#sScore').textContent = hasRes ? scoreEntry({picks:state.picks,wildcards:state.wildcards}).total : '—';
   const complete = picked===MATCHES.length && state.wildcards.length===8 && $('#playerName').value.trim();
@@ -469,10 +459,7 @@ function refreshSummary(){
   else if (!complete) $('#submitMsg').textContent = `Finish all picks: ${MATCHES.length-picked} matches and ${8-state.wildcards.length} wild cards to go.`;
   else $('#submitMsg').textContent='All set! Submit your entry. 🎉';
 }
-function flash(node,msg){
-  const f = el('span','muted',' '+msg); f.style.color='var(--gold)';
-  node.appendChild(f); setTimeout(()=>f.remove(),1500);
-}
+function flash(node,msg){ const f=el('span','muted',' '+msg); f.style.color='var(--gold)'; node.appendChild(f); setTimeout(()=>f.remove(),1500); }
 function applyPicksToForm(){
   for (const m of MATCHES){ const s=$('#sel-'+m.id); if(s){ s.value=state.picks[m.id]||''; s.classList.toggle('picked',!!s.value);} }
   syncWildUI(); refreshSummary();
@@ -488,7 +475,6 @@ function renderBoard(){
   if (!ids.length){ root.innerHTML='<div class="empty">No entries yet. Be the first to submit your picks! 🥇</div>'; return; }
   const rows = ids.map(id=>{ const e=state.entries[id]; return { id, name:e.name||'Anonymous', ...scoreEntry(e), at:e.createdAt||0 }; });
   rows.sort((a,b)=> b.total-a.total || b.correct-a.correct || a.at-b.at);
-  const hasRes = Object.keys(state.results.matches).length || (state.results.wildcards||[]).length;
   let html = `<table><thead><tr><th>#</th><th>Player</th><th class="num">Group</th><th class="num">Wild</th><th class="num">Correct</th><th class="num">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{
     const me = r.id===state.myId ? ' class="me"' : '';
@@ -498,66 +484,112 @@ function renderBoard(){
   });
   html += '</tbody></table>';
   root.innerHTML = html;
-  $('#boardMeta').textContent = hasRes
-    ? `${ids.length} players • scoring is live as results come in.`
-    : `${ids.length} players entered • standings will move once the commissioner enters results.`;
+  const scored = Object.keys(state.results.matches).length;
+  $('#boardMeta').textContent = scored
+    ? `${ids.length} players • ${scored}/72 matches scored • wild-card points ${state.groupComplete?'final':'lock in once the group stage ends'}.`
+    : `${ids.length} players entered • standings move automatically once matches kick off.`;
 }
-function renderResProgress(){
-  const ms = Object.keys(state.results.matches).length;
-  const ws = (state.results.wildcards||[]).length;
-  $('#resProg').style.width = (((ms+ws)/(MATCHES.length+8))*100).toFixed(1)+'%';
-  $('#resProgTxt').textContent = `${ms} / ${MATCHES.length} matches scored · ${ws} / 8 wild cards set`;
-  // reflect results on the picks form chips
+
+/* =========================================================================
+   RENDER — live results / standings
+   ========================================================================= */
+function renderResults(){
+  const scored = Object.keys(state.results.matches).length;
+  $('#resProg').style.width = ((scored/MATCHES.length)*100).toFixed(1)+'%';
+  $('#resProgTxt').textContent = `${scored} / ${MATCHES.length} matches played` + (state.groupComplete ? ' · group stage complete ✅' : '');
+  const srcName = {"football-data":"football-data.org","thesportsdb":"TheSportsDB","none":"no data yet","error":"feed error","…":"…"}[state.feed.source] || state.feed.source;
+  const when = state.feed.lastUpdated ? new Date(state.feed.lastUpdated).toLocaleTimeString() : '—';
+  $('#resStatus').innerHTML = `Source: <b>${srcName}</b> · last updated ${when} · auto-refreshes every ${Math.round(CONFIG.pollMs/1000)}s`;
+
+  // standings
+  const root = $('#standings'); root.innerHTML='';
+  for (const g of Object.keys(GROUPS)){
+    const arr = state.standings[g] || GROUPS[g].map((t,i)=>({code:t[0],pts:0,gd:0,gf:0,p:0,pos:i+1}));
+    const wrap = el('div','group');
+    wrap.appendChild(el('div','group-head',`<h3>Group ${g}</h3>`));
+    let h = `<table class="stbl"><thead><tr><th></th><th>Team</th><th class="num">P</th><th class="num">GD</th><th class="num">Pts</th></tr></thead><tbody>`;
+    arr.forEach((t,i)=>{
+      const T=TEAM[t.code];
+      const cls = i<2 ? 'qual' : (state.proj.includes(t.code) ? 'wild' : '');
+      h += `<tr><td>${i+1}</td><td class="${cls}">${T[2]} ${T[1]}</td><td class="num">${t.p}</td><td class="num">${t.gd>0?'+':''}${t.gd}</td><td class="num"><b>${t.pts}</b></td></tr>`;
+    });
+    h += '</tbody></table>';
+    const body = el('div'); body.style.padding='4px 10px 10px'; body.innerHTML=h;
+    wrap.appendChild(body); root.appendChild(wrap);
+  }
+  // wildcard tracker
+  const wc = $('#wcTrack'); wc.innerHTML='';
+  if (!state.proj.length){ wc.innerHTML='<span class="muted">Not enough results yet to project the wild cards.</span>'; }
+  else state.proj.forEach(code=>{ const T=TEAM[code]; const c=el('div','chip ro win',`${T[2]} ${T[1]}`); wc.appendChild(c); });
+  $('#wcTrackNote').textContent = state.groupComplete
+    ? 'Final 8 wild-card qualifiers (3rd-placed teams that advanced):'
+    : 'The 8 best third-placed teams currently projected to advance (updates live):';
+
+  // reflect onto picks form chips + match chips
   for (const m of MATCHES){
     const chip=$('#rc-'+m.id); if(!chip) continue;
     const r=state.results.matches[m.id];
     if(!r){ chip.classList.add('hide'); continue; }
     chip.classList.remove('hide');
-    const label = r==='home'?(m.home[2]+' win'):r==='away'?(m.away[2]+' win'):'Draw';
+    const H=TEAM[m.home],A=TEAM[m.away];
+    const label = r==='home'?(H[2]+' win'):r==='away'?(A[2]+' win'):'Draw';
     const mine = state.picks[m.id];
     chip.textContent = 'Result: '+label;
     chip.className = 'res-chip ' + (mine? (mine===r?'hit':'miss') : '');
   }
-  ALL_TEAMS.forEach(t=>{ const c=$('#wc-'+t[0]); if(c) c.classList.toggle('win',(state.results.wildcards||[]).includes(t[0])); });
+  ALL_TEAMS.forEach(t=>{ const c=$('#wc-'+t[0]); if(c) c.classList.toggle('win', state.proj.includes(t[0])); });
 }
-function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* =========================================================================
-   RENDER — admin
+   LIVE FEED — fetch + compute everything automatically
    ========================================================================= */
-function buildAdmin(){
-  const root = $('#adminGroups'); root.innerHTML='';
-  for (const g of Object.keys(GROUPS)){
-    const box=el('div','group'); const head=el('div','group-head',`<h3>Group ${g}</h3>`);
-    const body=el('div','matches');
-    MATCHES.filter(m=>m.group===g).forEach(m=>{
-      const row=el('div','match');
-      row.appendChild(el('div','teams',`${m.home[2]} ${m.home[1]} <span class="vs">vs</span> ${m.away[2]} ${m.away[1]}`));
-      const sel=el('select'); sel.id='asel-'+m.id;
-      sel.innerHTML=`<option value="">— not played —</option>
-        <option value="home">${m.home[1]} win</option><option value="draw">Draw</option><option value="away">${m.away[1]} win</option>`;
-      sel.onchange=()=>{ const r={...state.results}; if(sel.value) r.matches={...r.matches,[m.id]:sel.value}; else { r.matches={...r.matches}; delete r.matches[m.id]; } Store.saveResults(r); };
-      row.appendChild(sel); body.appendChild(row);
-    });
-    box.appendChild(head); box.appendChild(body); root.appendChild(box);
-  }
-  const wroot=$('#adminWild'); wroot.innerHTML='';
-  ALL_TEAMS.slice().sort((a,b)=>a[1].localeCompare(b[1])).forEach(t=>{
-    const c=el('div','chip',`${t[2]} ${t[1]}`); c.id='awc-'+t[0];
-    c.onclick=()=>{
-      const r={...state.results, wildcards:[...(state.results.wildcards||[])]};
-      const i=r.wildcards.indexOf(t[0]);
-      if(i>=0) r.wildcards.splice(i,1);
-      else { if(r.wildcards.length>=8){ flash($('#awcCount').parentElement,'8 max'); return; } r.wildcards.push(t[0]); }
-      Store.saveResults(r);
-    };
-    wroot.appendChild(c);
+function ingest(apiMatches){
+  const matches = {};
+  const tbl = {};
+  Object.keys(GROUPS).forEach(g=>{ tbl[g]={}; GROUPS[g].forEach(t=>tbl[g][t[0]]={code:t[0],p:0,w:0,d:0,l:0,gf:0,ga:0}); });
+  (apiMatches||[]).forEach(am=>{
+    const hc=codeOf(am.home), ac=codeOf(am.away);
+    const hs=Number(am.hs), as=Number(am.as);
+    if(!hc||!ac||!Number.isFinite(hs)||!Number.isFinite(as)) return;
+    const mm = PAIR2MATCH[[hc,ac].sort().join('|')];
+    if(mm){ const win = hs>as?hc : as>hs?ac : null; matches[mm.id] = win===null?'draw' : (win===mm.home?'home':'away'); }
+    const g = TEAMGROUP[hc];
+    if(g && TEAMGROUP[ac]===g){
+      const H=tbl[g][hc], A=tbl[g][ac];
+      H.p++;A.p++;H.gf+=hs;H.ga+=as;A.gf+=as;A.ga+=hs;
+      if(hs>as){H.w++;A.l++;} else if(as>hs){A.w++;H.l++;} else {H.d++;A.d++;}
+    }
   });
+  const standings = {};
+  Object.keys(GROUPS).forEach(g=>{
+    const arr = Object.values(tbl[g]).map(t=>({ ...t, gd:t.gf-t.ga, pts:t.w*3+t.d }));
+    arr.sort((a,b)=> b.pts-a.pts || b.gd-a.gd || b.gf-a.gf || TEAM[a.code][1].localeCompare(TEAM[b.code][1]));
+    arr.forEach((t,i)=>t.pos=i+1);
+    standings[g]=arr;
+  });
+  const thirds = Object.keys(GROUPS).map(g=>standings[g][2]).filter(Boolean);
+  thirds.sort((a,b)=> b.pts-a.pts || b.gd-a.gd || b.gf-a.gf);
+  const proj = thirds.slice(0,8).map(t=>t.code);
+  const groupComplete = Object.keys(matches).length === MATCHES.length;
+  return { matches, standings, proj, groupComplete };
 }
-function syncAdmin(){
-  for (const m of MATCHES){ const s=$('#asel-'+m.id); if(s) s.value=state.results.matches[m.id]||''; }
-  ALL_TEAMS.forEach(t=>{ const c=$('#awc-'+t[0]); if(c) c.classList.toggle('on',(state.results.wildcards||[]).includes(t[0])); });
-  $('#awcCount').textContent = (state.results.wildcards||[]).length;
+async function fetchLive(){
+  try{
+    const r = await fetch(CONFIG.resultsEndpoint, { cache:'no-store' });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    const out = ingest(data.matches||[]);
+    state.results.matches = out.matches;
+    state.standings = out.standings;
+    state.proj = out.proj;
+    state.groupComplete = out.groupComplete;
+    state.results.wildcards = out.groupComplete ? out.proj : [];
+    state.feed = { source:data.source||'none', lastUpdated:data.lastUpdated||new Date().toISOString(), played:Object.keys(out.matches).length };
+  }catch(e){
+    state.feed = { source: state.feed.source==='…'?'none':state.feed.source, lastUpdated:state.feed.lastUpdated, played:state.feed.played, error:String(e) };
+    if($('#resStatus')) $('#resStatus').innerHTML = `⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e))})</span>`;
+  }
+  renderBoard(); renderResults(); refreshSummary();
 }
 
 /* =========================================================================
@@ -567,21 +599,24 @@ function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   $('#tab-picks').classList.toggle('hide',name!=='picks');
   $('#tab-board').classList.toggle('hide',name!=='board');
-  $('#tab-admin').classList.toggle('hide',name!=='admin');
+  $('#tab-results').classList.toggle('hide',name!=='results');
+  if(name!=='picks') fetchLive();
 }
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
+$('#refreshNow').onclick = fetchLive;
 
-$('#playerName').oninput = refreshSummary;
+$('#playerName').oninput = () => { saveDraft(); };
 $('#randomFill').onclick = () => {
-  for (const m of MATCHES){ if(!state.picks[m.id]){ state.picks[m.id]=['home','draw','away'][Math.floor(Math.random()*3)]; } }
+  if (isLocked()) return;
+  for (const m of MATCHES){ if(!state.picks[m.id]) state.picks[m.id]=['home','draw','away'][Math.floor(Math.random()*3)]; }
   while (state.wildcards.length<8){ const t=ALL_TEAMS[Math.floor(Math.random()*ALL_TEAMS.length)][0]; if(!state.wildcards.includes(t)) state.wildcards.push(t); }
   applyPicksToForm(); saveDraft();
 };
-$('#clearPicks').onclick = () => { state.picks={}; state.wildcards=[]; applyPicksToForm(); saveDraft(); };
+$('#clearPicks').onclick = () => { if(isLocked())return; state.picks={}; state.wildcards=[]; applyPicksToForm(); saveDraft(); };
 
 $('#copyCode').onclick = async () => {
-  try{ await navigator.clipboard.writeText(encodePicks()); toast($('#copyCode'),'Copied!'); }
-  catch{ $('#importBox').classList.remove('hide'); $('#importText').value=encodePicks(); }
+  try{ await navigator.clipboard.writeText(enc()); toast($('#copyCode'),'Copied!'); }
+  catch{ $('#importBox').classList.remove('hide'); $('#importText').value=enc(); }
 };
 $('#downloadBtn').onclick = () => {
   const blob=new Blob([JSON.stringify({name:$('#playerName').value.trim(),picks:state.picks,wildcards:state.wildcards},null,2)],{type:'application/json'});
@@ -591,7 +626,7 @@ $('#importBtn').onclick = () => $('#importBox').classList.toggle('hide');
 $('#importCancel').onclick = () => $('#importBox').classList.add('hide');
 $('#importApply').onclick = () => {
   try{
-    const d=decodePicks($('#importText').value);
+    const d=dec($('#importText').value);
     state.picks=d.picks||{}; state.wildcards=(d.wildcards||[]).slice(0,8);
     if(d.name) $('#playerName').value=d.name;
     applyPicksToForm(); saveDraft(); $('#importBox').classList.add('hide'); toast($('#importApply'),'Loaded!');
@@ -602,38 +637,27 @@ $('#submitBtn').onclick = async () => {
   if (isLocked()) return;
   const name=$('#playerName').value.trim(); if(!name) return;
   if (Object.keys(state.picks).length!==MATCHES.length || state.wildcards.length!==8) return;
-  if (!state.myId) state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-  localStorage.setItem('wc_my_id',state.myId);
+  if (!state.myId){ state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); localStorage.setItem('wc_my_id',state.myId); }
   const existing = state.entries[state.myId];
-  const entry={ name, picks:state.picks, wildcards:state.wildcards, createdAt: existing?.createdAt || Date.now(), updatedAt:Date.now() };
+  const entry={ name, picks:state.picks, wildcards:state.wildcards, createdAt: (existing&&existing.createdAt)||Date.now(), updatedAt:Date.now() };
   $('#submitBtn').disabled=true; $('#submitMsg').textContent='Saving…';
   try{ await Store.saveEntry(state.myId, entry); $('#submitMsg').textContent='✅ Entry saved! Switching to leaderboard…'; setTimeout(()=>switchTab('board'),700); }
   catch(e){ $('#submitMsg').textContent='⚠️ Could not save: '+e.message; $('#submitBtn').disabled=false; }
 };
 
-$('#adminUnlock').onclick = () => {
-  if ($('#adminPass').value === CONFIG.adminPass){ state.admin=true; $('#adminGate').classList.add('hide'); $('#adminPanel').classList.remove('hide'); buildAdmin(); syncAdmin(); }
-  else $('#adminMsg').textContent='Wrong passcode.';
-};
-
 function saveDraft(){ localStorage.setItem('wc_draft', JSON.stringify({name:$('#playerName').value,picks:state.picks,wildcards:state.wildcards})); refreshSummary(); }
-function loadDraft(){
-  try{ const d=JSON.parse(localStorage.getItem('wc_draft')||'null'); if(d){ if(d.name)$('#playerName').value=d.name; state.picks=d.picks||{}; state.wildcards=(d.wildcards||[]).slice(0,8);} }catch{}
-}
-// autosave drafts on any change
-document.addEventListener('change', e=>{ if(e.target.matches('#groups select, #playerName')) saveDraft(); });
+function loadDraft(){ try{ const d=JSON.parse(localStorage.getItem('wc_draft')||'null'); if(d){ if(d.name)$('#playerName').value=d.name; state.picks=d.picks||{}; state.wildcards=(d.wildcards||[]).slice(0,8);} }catch{} }
 function toast(btn,msg){ const o=btn.textContent; btn.textContent=msg; setTimeout(()=>btn.textContent=o,1200); }
 
 /* =========================================================================
    COUNTDOWN
    ========================================================================= */
 function tickClock(){
-  const diff = lockTime - Date.now();
-  const c=$('#clock');
+  const diff = lockTime - Date.now(); const c=$('#clock');
   if (diff<=0){
-    c.textContent='LOCKED';
-    $('#lockBanner').classList.remove('hide');
-    document.querySelectorAll('#groups select, #wildcards .chip, #randomFill, #clearPicks, #playerName, #submitBtn').forEach(n=>{ n.disabled=true; n.style.pointerEvents='none'; });
+    c.textContent='LOCKED'; $('#lockBanner').classList.remove('hide');
+    document.querySelectorAll('#groups select, #randomFill, #clearPicks, #playerName, #submitBtn').forEach(n=>{ n.disabled=true; });
+    document.querySelectorAll('#wildcards .chip').forEach(n=>{ n.classList.add('ro'); });
     return;
   }
   const d=Math.floor(diff/864e5), h=Math.floor(diff/36e5)%24, m=Math.floor(diff/6e4)%60, s=Math.floor(diff/1e3)%60;
@@ -646,24 +670,24 @@ function tickClock(){
 function setModeBanner(){
   const dot=$('#liveDot'), txt=$('#liveText'), b=$('#modeBanner');
   if (Store.isCloud){
-    dot.classList.remove('off'); txt.textContent='Live';
-    b.className='banner ok'; b.innerHTML='🟢 <b>Live mode.</b> Everyone shares one leaderboard — submit and watch standings update in real time.';
+    dot.classList.remove('off'); txt.textContent='Live · shared';
+    b.className='banner ok';
+    b.innerHTML='🟢 <b>Live shared mode.</b> Everyone plays on one leaderboard and results are scored automatically — no manual entry, ever.';
   } else {
     dot.classList.add('off'); txt.textContent='Local mode';
     b.className='banner warn';
-    b.innerHTML='⚠️ <b>Local mode</b> (no live sync yet). Your picks save on this device — use <b>Copy pick code</b> to share, and the commissioner can import codes. Paste a Firebase config in <span class="kbd">CONFIG.firebase</span> to switch on the live shared leaderboard.';
+    b.innerHTML='⚠️ <b>Local mode</b> (picks saved on this device). Results still auto-score, but to share ONE leaderboard with friends, add a Firebase config in <span class="kbd">CONFIG.firebase</span>.';
   }
 }
-
 (async function init(){
   buildGroups(); buildWildcards();
   loadDraft(); applyPicksToForm();
   Store.onEntries(d=>{ state.entries=d||{}; renderBoard(); });
-  Store.onResults(d=>{ state.results = d && d.matches ? d : {matches:{},wildcards:[]}; renderBoard(); renderResProgress(); if(state.admin) syncAdmin(); refreshSummary(); });
   await Store.init();
   setModeBanner();
   tickClock(); setInterval(tickClock,1000);
   refreshSummary();
+  fetchLive(); setInterval(fetchLive, CONFIG.pollMs);
 })();
 </script>
 </body>
