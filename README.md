@@ -32,10 +32,11 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 | Correct group **runner-up** (2nd) | **+1** each |
 | Correct **wild card** (3rd-placed qualifier) | **+2** each |
 | Correct group **match result** | **+1** each |
+| **Exact scoreline** of a match (e.g. you said 2–1, it finished 2–1) | **+2** bonus |
 | Team reaches **Round of 16 / QF / SF / Final** | **+2 / +4 / +8 / +12** each |
 | Correct **Champion** | **+20** |
 | **Exact knockout tie** (both teams meet + you pick the winner) | **+3** bonus |
-| **Maximum** | **357** |
+| **Maximum** | **501** |
 
 Knockouts are scored two ways at once: points for each of your teams that actually
 reaches a round (progression), **plus** a bonus whenever a tie you predicted really
