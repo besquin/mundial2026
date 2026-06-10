@@ -28,11 +28,19 @@ entry, and watch the **live leaderboard** — results are pulled and scored
 ## Scoring
 | What | Points |
 |---|---|
-| Correct group-match result (win / draw / win) | **+3** |
-| Correct wild-card team (3rd-placed side that advances) | **+5** |
-| **Maximum** | **256** |
+| Correct group **winner** (1st) | **+2** each |
+| Correct group **runner-up** (2nd) | **+1** each |
+| Correct **wild card** (3rd-placed qualifier) | **+2** each |
+| Correct group **match result** | **+1** each |
+| Team reaches **Round of 16 / QF / SF / Final** | **+2 / +4 / +8 / +12** each |
+| Correct **Champion** | **+20** |
+| **Exact knockout tie** (both teams meet + you pick the winner) | **+3** bonus |
+| **Maximum** | **357** |
 
-Ties are broken by total correct picks, then earliest submission.
+Knockouts are scored two ways at once: points for each of your teams that actually
+reaches a round (progression), **plus** a bonus whenever a tie you predicted really
+happens and you called the winner. Ties on the leaderboard break by total correct
+picks, then earliest submission. All weights are editable in `CONFIG.scoring`.
 
 ## How it works (all free, no accounts)
 - **Hosting:** GitHub Pages (static site).

@@ -249,7 +249,7 @@ const CONFIG = {
   sportsdb: { key: "3", leagueId: "4429", season: "2026" },
   pollMs: 60000, entriesPollMs: 15000,
   // Points per correct prediction (edit freely)
-  scoring: { match:1, first:2, second:1, wildcard:2, r16:2, qf:4, sf:8, finalist:12, champion:20 },
+  scoring: { match:1, first:2, second:1, wildcard:2, r16:2, qf:4, sf:8, finalist:12, champion:20, matchupBonus:3 },
   // Prizes (% of the pot)
   prizes: [
     { place:"🥇 1st place", prize:"60% of the pot" },
@@ -321,7 +321,7 @@ const state={
   entries:{},
   results:{matches:{}},
   standings:{},
-  actual:{ groups:{}, wildcards:[], ko:{R16:[],QF:[],SF:[],F:[]}, champion:null },
+  actual:{ groups:{}, wildcards:[], ko:{R16:[],QF:[],SF:[],F:[]}, koMatches:[], champion:null },
   proj:[], groupComplete:false,
   feed:{source:"…",lastUpdated:null,played:0}
 };
@@ -389,6 +389,9 @@ function bracketAdvancers(entry){
   const w=entry.bracket||{};const win=ids=>ids.map(id=>w[id]).filter(Boolean);
   return{R16:win(R32IDS),QF:win(R16IDS),SF:win(QFIDS),F:win(SFIDS),champion:w[FINID]||null};
 }
+function seedMapFor(e){const m={};GLETTERS.forEach(g=>{const gp=(e.groupPicks&&e.groupPicks[g])||{};m['1'+g]=gp.first||null;m['2'+g]=gp.second||null;});(e.wildcards||[]).forEach((c,i)=>m['T'+(i+1)]=c);return m;}
+function koCodeFor(e,side,sm){return side.seed?(sm[side.seed]||null):((e.bracket||{})[side.match]||null);}
+function predictedTies(e){const sm=seedMapFor(e);const ties=[];for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);const w=(e.bracket||{})[m.id];if(a&&b&&w)ties.push({pair:[a,b].sort().join('|'),winner:w});}return ties;}
 function scoreEntry(e){
   const S=CONFIG.scoring;let pts=0;
   let mC=0; for(const m of MATCHES){const r=state.results.matches[m.id];if(r&&e.picks&&e.picks[m.id]===r){pts+=S.match;mC++;}}
@@ -397,10 +400,12 @@ function scoreEntry(e){
   let kC=0; const adv=bracketAdvancers(e);
   [['R16',S.r16],['QF',S.qf],['SF',S.sf],['F',S.finalist]].forEach(([rd,p])=>{const set=state.actual.ko[rd]||[];(adv[rd]||[]).forEach(c=>{if(set.includes(c)){pts+=p;kC++;}});});
   if(adv.champion&&state.actual.champion&&adv.champion===state.actual.champion){pts+=S.champion;kC++;}
-  const matchPts=mC*S.match, groupPts=pts-matchPts-wC*S.wildcard; // not used granularly
-  return{total:pts,matchCorrect:mC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC};
+  // exact-tie bonus: a knockout match you predicted (both teams + the winner) actually happened
+  let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.pair]=am.winner;});
+  predictedTies(e).forEach(t=>{if(actM[t.pair]&&actM[t.pair]===t.winner){pts+=S.matchupBonus;bC++;}});
+  return{total:pts,matchCorrect:mC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC,matchupHits:bC};
 }
-function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*S.match+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion;}
+function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*S.match+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion+KO.length*S.matchupBonus;}
 
 /* =========================== PICKS FORM =========================== */
 function buildGroups(){
@@ -466,6 +471,7 @@ function seedStrength(){const sm=seedMap();const s={};Object.keys(sm).forEach(re
 function renderBracket(){
   normalizeBracket();
   const sm=seedMap();const wrap=$('#bracket');if(!wrap)return;wrap.innerHTML='';
+  const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
   const seedsReady=GLETTERS.every(g=>state.groupPicks[g].first&&state.groupPicks[g].second)&&state.wildcards.length===8;
   if(!seedsReady){$('#bracketNote').innerHTML='⛏️ Finish your <b>group 1st & 2nd</b> for all 12 groups and pick your <b>8 wild cards</b> to unlock the bracket.';}
   else {$('#bracketNote').innerHTML='Click the team you think wins each tie, all the way to the champion. Points rise every round.';}
@@ -475,10 +481,11 @@ function renderBracket(){
     if(rd.pts)col.appendChild(el('div','pl','+'+rd.pts+'/team'));
     rd.ids.forEach(id=>{
       const m=KOBYID[id];const a=koCode(m.a,sm),b=koCode(m.b,sm);const w=state.bracket[id];
+      const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
       const box=el('div','bmatch');
       [['a',a,m.a],['b',b,m.b]].forEach(([k,code,side])=>{
         const lbl=code?fa(code):(side.seed?seedLabel(side.seed):'Winner '+side.match);
-        const row=el('div','bteam'+(code?'':' empty')+(w&&w===code?' win':''));
+        const row=el('div','bteam'+(code?'':' empty')+(w&&w===code?' win':'')+(w&&w===code&&aw&&aw===w?' correct':''));
         row.innerHTML=`<span>${escapeHtml(lbl)}</span>`;
         if(code&&!isLocked())row.onclick=()=>{state.bracket[id]=code;normalizeBracket();renderBracket();saveDraft();};
         box.appendChild(row);
@@ -579,7 +586,7 @@ async function fetchSportsDB(){
 }
 function ingest(events){
   const matches={};const tbl={};GLETTERS.forEach(g=>{tbl[g]={};GROUPS[g].forEach(t=>tbl[g][t[0]]={code:t[0],p:0,w:0,d:0,gf:0,ga:0});});
-  const ko={R16:[],QF:[],SF:[],F:[]};let champion=null;
+  const ko={R16:[],QF:[],SF:[],F:[]};const koMatches=[];let champion=null;
   (events||[]).forEach(ev=>{
     const hc=codeOf(ev.home),ac=codeOf(ev.away);if(!hc||!ac)return;
     if(ev.stage==='GROUP'){
@@ -589,7 +596,9 @@ function ingest(events){
     } else if(['R16','QF','SF','F'].includes(ev.stage)){
       if(!ko[ev.stage].includes(hc))ko[ev.stage].push(hc);
       if(!ko[ev.stage].includes(ac))ko[ev.stage].push(ac);
-      if(ev.stage==='F'&&Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as){champion=ev.hs>ev.as?hc:ac;}
+      let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac;
+      koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:ev.stage});
+      if(ev.stage==='F'&&win)champion=win;
     }
   });
   const standings={};const groups={};
@@ -604,7 +613,7 @@ function ingest(events){
   thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
   const proj=thirds.slice(0,8).map(t=>t.code);
   const groupComplete=Object.keys(matches).length===MATCHES.length;
-  return{matches,standings,groups,proj,groupComplete,ko,champion};
+  return{matches,standings,groups,proj,groupComplete,ko,koMatches,champion};
 }
 async function fetchLive(){
   let data=null;
@@ -613,7 +622,7 @@ async function fetchLive(){
   if(data){
     const out=ingest(data.events||[]);
     state.results.matches=out.matches;state.standings=out.standings;state.proj=out.proj;state.groupComplete=out.groupComplete;
-    state.actual.groups=out.groups;state.actual.wildcards=out.groupComplete?out.proj:[];state.actual.ko=out.ko;state.actual.champion=out.champion;
+    state.actual.groups=out.groups;state.actual.wildcards=out.groupComplete?out.proj:[];state.actual.ko=out.ko;state.actual.koMatches=out.koMatches;state.actual.champion=out.champion;
     state.feed={source:data.source||'none',lastUpdated:data.lastUpdated||new Date().toISOString(),played:Object.keys(out.matches).length};
   }
   renderBoard();renderResults();refreshSummary();
@@ -663,7 +672,8 @@ function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<
   <li><b>+${S.first}</b> correct group winner · <b>+${S.second}</b> correct runner-up (each group)</li>
   <li><b>+${S.wildcard}</b> each correct wild card (3rd-placed qualifier)</li>
   <li><b>+${S.match}</b> per correct group-match result</li>
-  <li>Knockouts (per correct team): R16 <b>+${S.r16}</b> · QF <b>+${S.qf}</b> · SF <b>+${S.sf}</b> · Final <b>+${S.finalist}</b> · Champion <b>+${S.champion}</b></li>
+  <li>Knockouts (per team reaching the round): R16 <b>+${S.r16}</b> · QF <b>+${S.qf}</b> · SF <b>+${S.sf}</b> · Final <b>+${S.finalist}</b> · Champion <b>+${S.champion}</b></li>
+  <li>Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet & you pick the winner)</li>
   <li>Max <b>${maxPoints()}</b> pts · auto-scored from a live feed</li></ul>`;}
 function setModeBanner(){const dot=$('#liveDot'),txt=$('#liveText'),b=$('#modeBanner');if(Store.mode==='cloud'||Store.mode==='pool'){dot.classList.remove('off');txt.textContent='Live · shared';b.className='banner ok';b.innerHTML='🟢 <b>Live shared mode.</b> One leaderboard for everyone, auto-scored — no manual entry.';}else{dot.classList.add('off');txt.textContent='Ready';b.className='banner warn';b.innerHTML='👋 <b>Welcome!</b> Fill your picks and hit <b>Submit</b> — that creates a shared pool and an invite link for friends.';}renderShare();}
 function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(url){$('#shareUrl').value=url;card.classList.remove('hide');try{if(window.qrcode){const qr=qrcode(0,'M');qr.addData(url);qr.make();$('#qrImg').src=qr.createDataURL(5,8);$('#qrWrap').classList.remove('hide');}}catch(e){$('#qrWrap').classList.add('hide');}}else card.classList.add('hide');if(Store.poolError){const b=$('#modeBanner');b.className='banner warn';b.innerHTML='⚠️ Couldn\'t reach the shared store — picks saved on this device. Use <b>Copy my pick code</b> to share, or try again later.';}}
