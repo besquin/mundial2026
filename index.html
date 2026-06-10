@@ -148,6 +148,15 @@
     <div id="lockBanner" class="banner locked hide">🔒 <b>Entries are locked.</b> The tournament has kicked off — results are now scored automatically. Head to the Leaderboard.</div>
     <div id="modeBanner" class="banner warn"></div>
 
+    <div id="shareCard" class="card hide">
+      <h2>🔗 Your pool invite link</h2>
+      <p class="muted">Send this to your friends — everyone who opens it joins the <b>same live leaderboard</b>. Bookmark it for yourself too.</p>
+      <div class="btnrow">
+        <input type="text" id="shareUrl" readonly style="flex:1;min-width:220px"/>
+        <button class="btn sm" id="copyShare">📋 Copy link</button>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Your entry</h2>
       <p class="muted">Enter your name, predict every match, choose 8 wild-card teams, then submit. You can edit until the lock — after that everything scores automatically.</p>
@@ -258,9 +267,13 @@ const CONFIG = {
   openerISO: "2026-06-11T20:00:00-06:00",
   lockISO:   "2026-06-11T19:00:00-06:00",
 
-  // Live results are fetched from this endpoint (the bundled Vercel function).
-  resultsEndpoint: "/api/results",
+  // Live match results. On a static host (e.g. GitHub Pages) we read TheSportsDB
+  // directly in the browser — no key, no server. If you ever deploy on Vercel,
+  // set resultsEndpoint to "/api/results" to use the bundled serverless feed.
+  resultsEndpoint: null,
+  sportsdb: { key: "3", leagueId: "4429", season: "2026" },
   pollMs: 60000,
+  entriesPollMs: 15000,
 
   // PASTE your Firebase Realtime Database config below to share ONE leaderboard
   // across all your friends. Leave databaseURL empty to run in local mode.
@@ -345,37 +358,74 @@ const state = {
    STORE — Firebase (entries only) if configured, else localStorage
    ========================================================================= */
 const Store = (() => {
-  const useFB = !!(CONFIG.firebase && CONFIG.firebase.databaseURL);
+  const FB = !!(CONFIG.firebase && CONFIG.firebase.databaseURL);
+  const JB = 'https://jsonblob.com/api/jsonBlob';
+  let mode = 'local';        // 'cloud' (firebase) | 'pool' (jsonblob) | 'local'
+  let poolId = null, poolError = false;
   let db = null, fns = null;
   const listeners = [];
   const emit = v => listeners.forEach(fn => fn(v));
   const LK = 'wc_entries';
   const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('wc26') : null;
   const localLoad = () => JSON.parse(localStorage.getItem(LK) || '{}');
+  const poolFromUrl = () => { const m = location.hash.match(/pool=([A-Za-z0-9_-]+)/); return m ? m[1] : null; };
+  const setHash = id => { if (!location.hash.includes('pool='+id)) history.replaceState(null,'','#pool='+id); };
+
+  async function poolGet(){ const r = await fetch(JB+'/'+poolId, { cache:'no-store', headers:{Accept:'application/json'} }); if(!r.ok) throw new Error('pool read '+r.status); return r.json(); }
+  async function poolPut(d){ const r = await fetch(JB+'/'+poolId, { method:'PUT', headers:{'Content-Type':'application/json',Accept:'application/json'}, body:JSON.stringify(d) }); if(!r.ok) throw new Error('pool write '+r.status); }
+  function startPoll(){ const tick = async () => { try{ const d = await poolGet(); poolError=false; emit(d.entries||{}); }catch(e){ poolError=true; } }; tick(); setInterval(tick, CONFIG.entriesPollMs); }
+
+  async function createPool(){
+    const r = await fetch(JB, { method:'POST', headers:{'Content-Type':'application/json',Accept:'application/json'}, body:JSON.stringify({ entries:{}, createdAt:Date.now() }) });
+    if(!r.ok) throw new Error('create '+r.status);
+    let id = r.headers.get('X-jsonblob');
+    if(!id){ const loc = r.headers.get('Location'); if(loc) id = loc.split('/').pop(); }
+    if(!id) throw new Error('no pool id returned');
+    poolId = id; mode = 'pool'; poolError = false;
+    localStorage.setItem('wc_pool', id); setHash(id); startPoll();
+    return id;
+  }
 
   async function init(){
-    if (useFB){
+    if (FB){
       try{
         const appMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
         const dbMod  = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
         const app = appMod.initializeApp(CONFIG.firebase);
         db = dbMod.getDatabase(app); fns = dbMod;
         dbMod.onValue(dbMod.ref(db,'entries'), s => emit(s.val() || {}));
-        return 'cloud';
-      }catch(e){ console.warn('Firebase failed, local mode', e); }
+        mode = 'cloud'; return mode;
+      }catch(e){ console.warn('Firebase failed, falling back', e); }
     }
+    poolId = poolFromUrl() || localStorage.getItem('wc_pool') || null;
+    if (poolId){ mode = 'pool'; localStorage.setItem('wc_pool', poolId); setHash(poolId); startPoll(); return mode; }
+    mode = 'local';
     const fire = () => emit(localLoad());
-    window.addEventListener('storage', fire);
-    if (bc) bc.onmessage = fire;
-    setTimeout(fire, 0);
-    return 'local';
+    window.addEventListener('storage', fire); if (bc) bc.onmessage = fire;
+    setTimeout(fire, 0); return mode;
   }
-  function onEntries(fn){ listeners.push(fn); }
+
   async function saveEntry(id, entry){
-    if (db){ await fns.set(fns.ref(db,'entries/'+id), entry); }
-    else { const d = localLoad(); d[id] = entry; localStorage.setItem(LK, JSON.stringify(d)); emit(d); if(bc) bc.postMessage('x'); }
+    if (mode === 'cloud'){ await fns.set(fns.ref(db,'entries/'+id), entry); return; }
+    // First submit with no pool yet -> auto-create a shared pool (no account needed)
+    if (mode === 'local'){ try{ await createPool(); }catch(e){ poolError = true; } }
+    if (mode === 'pool'){
+      let d; try{ d = await poolGet(); }catch(e){ d = { entries:{} }; }
+      d.entries = d.entries || {}; d.entries[id] = entry;
+      await poolPut(d); emit(d.entries); return;
+    }
+    // local fallback (pool unreachable)
+    const l = localLoad(); l[id] = entry; localStorage.setItem(LK, JSON.stringify(l)); emit(l); if (bc) bc.postMessage('x');
   }
-  return { init, onEntries, saveEntry, get isCloud(){ return !!db; } };
+
+  return {
+    init, saveEntry,
+    onEntries: fn => listeners.push(fn),
+    get mode(){ return mode; },
+    get poolId(){ return poolId; },
+    get poolError(){ return poolError; },
+    get shareUrl(){ return poolId ? (location.origin + location.pathname + '#pool=' + poolId) : null; }
+  };
 })();
 
 /* =========================================================================
@@ -573,11 +623,25 @@ function ingest(apiMatches){
   const groupComplete = Object.keys(matches).length === MATCHES.length;
   return { matches, standings, proj, groupComplete };
 }
+async function fetchSportsDB(){
+  const c = CONFIG.sportsdb;
+  const url = 'https://www.thesportsdb.com/api/v1/json/'+c.key+'/eventsseason.php?id='+c.leagueId+'&s='+c.season;
+  const r = await fetch(url, { cache:'no-store' });
+  if(!r.ok) throw new Error('TheSportsDB HTTP '+r.status);
+  const j = await r.json();
+  const matches = (j.events||[]).filter(e=>{
+    const stage = (e.strStage||e.strGroup||e.strDescriptionEN||'');
+    const isGroup = /group/i.test(stage) || (e.strGroup && String(e.strGroup).trim()!=='');
+    return isGroup && e.intHomeScore!=null && e.intAwayScore!=null && e.intHomeScore!=='' && e.intAwayScore!=='';
+  }).map(e=>({ home:e.strHomeTeam, away:e.strAwayTeam, hs:Number(e.intHomeScore), as:Number(e.intAwayScore) }))
+    .filter(m=>m.home && m.away && Number.isFinite(m.hs) && Number.isFinite(m.as));
+  return { source:'thesportsdb', matches, lastUpdated:new Date().toISOString() };
+}
 async function fetchLive(){
-  try{
-    const r = await fetch(CONFIG.resultsEndpoint, { cache:'no-store' });
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const data = await r.json();
+  let data = null;
+  if (CONFIG.resultsEndpoint){ try{ const r = await fetch(CONFIG.resultsEndpoint,{cache:'no-store'}); if(r.ok) data = await r.json(); }catch(e){} }
+  if (!data){ try{ data = await fetchSportsDB(); }catch(e){ if($('#resStatus')) $('#resStatus').innerHTML = `⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e.message||e))})</span>`; } }
+  if (data){
     const out = ingest(data.matches||[]);
     state.results.matches = out.matches;
     state.standings = out.standings;
@@ -585,9 +649,6 @@ async function fetchLive(){
     state.groupComplete = out.groupComplete;
     state.results.wildcards = out.groupComplete ? out.proj : [];
     state.feed = { source:data.source||'none', lastUpdated:data.lastUpdated||new Date().toISOString(), played:Object.keys(out.matches).length };
-  }catch(e){
-    state.feed = { source: state.feed.source==='…'?'none':state.feed.source, lastUpdated:state.feed.lastUpdated, played:state.feed.played, error:String(e) };
-    if($('#resStatus')) $('#resStatus').innerHTML = `⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e))})</span>`;
   }
   renderBoard(); renderResults(); refreshSummary();
 }
@@ -640,9 +701,24 @@ $('#submitBtn').onclick = async () => {
   if (!state.myId){ state.myId='e_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); localStorage.setItem('wc_my_id',state.myId); }
   const existing = state.entries[state.myId];
   const entry={ name, picks:state.picks, wildcards:state.wildcards, createdAt: (existing&&existing.createdAt)||Date.now(), updatedAt:Date.now() };
+  const hadPool = !!Store.poolId;
   $('#submitBtn').disabled=true; $('#submitMsg').textContent='Saving…';
-  try{ await Store.saveEntry(state.myId, entry); $('#submitMsg').textContent='✅ Entry saved! Switching to leaderboard…'; setTimeout(()=>switchTab('board'),700); }
+  try{
+    await Store.saveEntry(state.myId, entry);
+    setModeBanner();
+    if (!hadPool && Store.poolId){
+      $('#submitMsg').textContent='✅ Entry saved & pool created! Copy your invite link above and send it to friends. 🎉';
+      $('#shareCard').scrollIntoView({behavior:'smooth',block:'center'});
+    } else {
+      $('#submitMsg').textContent='✅ Entry saved! Switching to leaderboard…'; setTimeout(()=>switchTab('board'),700);
+    }
+    $('#submitBtn').disabled=false;
+  }
   catch(e){ $('#submitMsg').textContent='⚠️ Could not save: '+e.message; $('#submitBtn').disabled=false; }
+};
+$('#copyShare').onclick = async () => {
+  try{ await navigator.clipboard.writeText(Store.shareUrl||''); toast($('#copyShare'),'Copied!'); }
+  catch{ const i=$('#shareUrl'); i.select(); document.execCommand && document.execCommand('copy'); toast($('#copyShare'),'Copied!'); }
 };
 
 function saveDraft(){ localStorage.setItem('wc_draft', JSON.stringify({name:$('#playerName').value,picks:state.picks,wildcards:state.wildcards})); refreshSummary(); }
@@ -669,14 +745,25 @@ function tickClock(){
    ========================================================================= */
 function setModeBanner(){
   const dot=$('#liveDot'), txt=$('#liveText'), b=$('#modeBanner');
-  if (Store.isCloud){
+  if (Store.mode==='cloud' || Store.mode==='pool'){
     dot.classList.remove('off'); txt.textContent='Live · shared';
     b.className='banner ok';
     b.innerHTML='🟢 <b>Live shared mode.</b> Everyone plays on one leaderboard and results are scored automatically — no manual entry, ever.';
   } else {
-    dot.classList.add('off'); txt.textContent='Local mode';
+    dot.classList.add('off'); txt.textContent='Ready';
     b.className='banner warn';
-    b.innerHTML='⚠️ <b>Local mode</b> (picks saved on this device). Results still auto-score, but to share ONE leaderboard with friends, add a Firebase config in <span class="kbd">CONFIG.firebase</span>.';
+    b.innerHTML='👋 <b>Welcome!</b> Fill in your picks and hit <b>Submit</b> — that creates a shared pool and gives you an invite link to send friends. Everyone who opens it joins the same live leaderboard.';
+  }
+  renderShare();
+}
+function renderShare(){
+  const url = Store.shareUrl;
+  const card = $('#shareCard');
+  if (url){ $('#shareUrl').value = url; card.classList.remove('hide'); }
+  else card.classList.add('hide');
+  if (Store.poolError){
+    const b=$('#modeBanner'); b.className='banner warn';
+    b.innerHTML='⚠️ Couldn\'t reach the shared store right now — your picks are saved on this device. Use <b>Copy my pick code</b> below to share with friends, or try submitting again later.';
   }
 }
 (async function init(){
