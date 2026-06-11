@@ -711,12 +711,12 @@ function applyAll(){
 function renderChamps(){
   const card=$('#champCard');if(!card)return;
   const ids=Object.keys(state.entries);
-  if(picksRevealed()||!ids.length){card.classList.add('hide');return;}
+  if(!picksRevealed()||!ids.length){card.classList.add('hide');return;}   // hidden until 30 min before kickoff
   const counts={};let total=0;
   ids.forEach(id=>{const c=state.entries[id].bracket&&state.entries[id].bracket[FINID];if(c&&TEAM[c]){counts[c]=(counts[c]||0)+1;total++;}});
   if(!total){card.classList.add('hide');return;}
   card.classList.remove('hide');
-  $('#champMeta').textContent='Across '+total+' submitted pick'+(total===1?'':'s')+' — the field favourites, without revealing individual entries (full picks unlock at reveal).';
+  $('#champMeta').textContent='% of the '+total+' entr'+(total===1?'y':'ies')+' tipping each team to win it all.';
   const rows=Object.keys(counts).map(c=>({c,n:counts[c]})).sort((a,b)=>b.n-a.n||fa(a.c).localeCompare(fa(b.c)));
   const max=rows[0].n;
   $('#champChart').innerHTML=rows.map(r=>{const pct=Math.round(r.n/total*100);const w=Math.round(r.n/max*100);
