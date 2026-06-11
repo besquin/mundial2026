@@ -735,6 +735,7 @@ function auditEntry(e){
   if((e.wildcards||[]).length!==8)iss.push('wild cards '+(e.wildcards||[]).length+'/8');
   const wcBad=(e.wildcards||[]).filter(c=>!TEAM[c]).length;if(wcBad)iss.push(wcBad+' invalid wild-card codes');
   const br=e.bracket||{};const brn=Object.keys(br).filter(k=>KOIDSET.has(k)&&br[k]).length;
+  if(!(br[FINID]||br.K31))iss.push('NO CHAMPION pick');
   if(brn<TOTAL_TIES)iss.push('bracket '+brn+'/'+TOTAL_TIES+(brn===0?' — needs re-entry (old bracket)':''));
   const draws=Object.keys(e.koScores||{}).filter(k=>{const s=e.koScores[k];return s&&s.h===s.a&&!(e.koPens&&e.koPens[k]);}).length;
   if(draws)iss.push(draws+' level KO tie(s) without a penalty pick');
