@@ -323,9 +323,9 @@
 <script>
 /* =========================== CONFIG =========================== */
 const CONFIG = {
-  openerISO: "2026-06-12T12:00:00-07:00",   // opener kickoff: 12:00 PM PDT, Jun 12
-  lockISO:   "2026-06-12T10:00:00-07:00",   // 2 hours before kickoff (10:00 AM PDT, Jun 12)
-  revealOffsetMin: 30,                        // others' picks reveal 30 min before kickoff (11:30 AM PDT Jun 12)
+  openerISO: "2026-06-11T12:00:00-07:00",   // opener kickoff: 12:00 PM PDT, Jun 11
+  lockISO:   "2026-06-11T10:00:00-07:00",   // 2 hours before kickoff (10:00 AM PDT, Jun 11)
+  revealOffsetMin: 30,                        // others' picks reveal 30 min before kickoff (11:30 AM PDT Jun 11)
   resultsEndpoint: null,
   sportsdb: { key: "3", leagueId: "4429", season: "2026" },
   pollMs: 60000, entriesPollMs: 15000,
@@ -566,10 +566,15 @@ function onScore(id){
 }
 function recomputeQualifiers(){
   const tb=tableFromScores(state.scores);
-  GLETTERS.forEach(gg=>{ state.groupPicks[gg]={first:tb[gg][0].code,second:tb[gg][1].code}; });
-  const thirds=GLETTERS.map(x=>tb[x][2]).filter(Boolean);
-  thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
-  state.wildcards=thirds.slice(0,8).map(t=>t.code);
+  GLETTERS.forEach(gg=>{
+    const scored=MATCHES.filter(m=>m.group===gg&&state.scores[m.id]).length;
+    state.groupPicks[gg]= scored>0 ? {first:tb[gg][0].code,second:tb[gg][1].code} : {first:null,second:null};
+  });
+  if(Object.keys(state.scores).length===MATCHES.length){   // wild cards only once all group scores are in
+    const thirds=GLETTERS.map(x=>tb[x][2]).filter(Boolean);
+    thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+    state.wildcards=thirds.slice(0,8).map(t=>t.code);
+  } else state.wildcards=[];
 }
 function renderGroupPred(g){
   const tb=tableFromScores(state.scores)[g];

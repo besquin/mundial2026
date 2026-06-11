@@ -85,7 +85,7 @@ GitHub Pages must be switched on once by the repo owner:
 All settings live in the `CONFIG` block near the top of the `<script>` in
 [`index.html`](index.html):
 
-- `lockISO` — when entries lock (currently `2026-06-12T10:00:00-07:00`, 2h before kickoff).
+- `lockISO` — when entries lock (currently `2026-06-11T10:00:00-07:00`, 2h before kickoff).
 - `sportsdb` — the live-results feed (`leagueId`, `season`). If results don't
   appear once matches start, adjust the league id here.
 - `firebase` — optional. Paste a Firebase Realtime Database config to use
