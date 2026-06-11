@@ -205,11 +205,6 @@
 
   <!-- ===== PICKS ===== -->
   <section id="tab-picks">
-    <div id="updateNote" class="banner warn" style="position:relative;padding-right:34px">
-      <button onclick="dismissNote()" title="Dismiss" style="position:absolute;top:6px;right:8px;background:none;border:none;color:inherit;cursor:pointer;font-size:16px">✕</button>
-      🔄 <b>Heads up:</b> the knockout bracket now uses the <b>official FIFA 2026</b> structure. If you submitted before today, please re‑check your <b>knockout scores</b>.<br>
-      ✏️ <b>To make changes:</b> on this device tap <b>Edit my picks</b>. On another device (e.g. your phone), type your <b>same name + your PIN</b> and tap <b>↻ Load my entry</b>. New here? Choose a name + a <b>secret PIN</b>, fill everything in, then <b>Submit</b>.
-    </div>
     <div class="card" style="border-color:rgba(34,197,94,.55);box-shadow:0 8px 24px rgba(34,197,94,.18)">
       <h2>👤 Your name</h2>
       <p class="muted">This is how your entry shows up on the leaderboard — make it unique (e.g. add an emoji) so friends can tell entries apart. <b>Editing on a different device?</b> Type the same name and tap <b>Load my entry</b>.</p>
@@ -408,6 +403,7 @@ const KO_ROUNDS=[
   {key:'F',label:'Final',ids:[FINID],pts:CONFIG.scoring.finalist}
 ];
 const TOTAL_TIES=KO.length; // 32 (incl. 3rd-place)
+const KOIDSET=new Set(KO.map(m=>m.id));
 function assignThirds(wc){
   wc=(wc||[]).filter(Boolean);
   const grp=wc.map(c=>TEAMGROUP[c]||'');
@@ -434,6 +430,7 @@ const STOREKEY=ISDEFAULT?'main':GROUPKEY;                                   // l
 const DBPATH=ISDEFAULT?'entries':('pools/'+GROUPKEY);                       // ribos = existing root 'entries'; others under 'pools/<g>'
 const GROUPLABEL=ISDEFAULT?'Ribos':(GROUPKEY.charAt(0).toUpperCase()+GROUPKEY.slice(1));
 const ME=((new URLSearchParams(location.search).get('me')||'').replace(/[^A-Za-z0-9_]/g,'').slice(0,40))||'';  // personal edit link ?me=<entryId>
+const AUDIT=new URLSearchParams(location.search).has('audit');  // organizer diagnostics: add ?audit=1
 const state={
   picks:{}, scores:{}, groupPicks:{}, groupManual:{}, wildcards:[], koScores:{}, koPens:{}, bracket:{},
   myId:ME||localStorage.getItem('wc_my_id_'+STOREKEY)||(ISDEFAULT?localStorage.getItem('wc_my_id'):null)||null,
@@ -699,6 +696,34 @@ function applyAll(){
   renderWildcards();renderAllGroups();renderBracket();refreshSummary();
 }
 
+/* =========================== AUDIT (organizer only) =========================== */
+function auditEntry(e){
+  const iss=[];
+  if(!e.name||!e.name.trim())iss.push('no name');
+  const sc=e.scores||{};const scn=MATCHES.filter(m=>sc[m.id]&&Number.isFinite(sc[m.id].h)&&Number.isFinite(sc[m.id].a)).length;
+  if(scn<MATCHES.length)iss.push('group scores '+scn+'/'+MATCHES.length);
+  const badc=Object.keys(sc).filter(id=>!MATCHES.find(m=>m.id===id)).length;if(badc)iss.push(badc+' stray score keys');
+  if((e.wildcards||[]).length!==8)iss.push('wild cards '+(e.wildcards||[]).length+'/8');
+  const wcBad=(e.wildcards||[]).filter(c=>!TEAM[c]).length;if(wcBad)iss.push(wcBad+' invalid wild-card codes');
+  const br=e.bracket||{};const brn=Object.keys(br).filter(k=>KOIDSET.has(k)&&br[k]).length;
+  if(brn<TOTAL_TIES)iss.push('bracket '+brn+'/'+TOTAL_TIES+(brn===0?' — needs re-entry (old bracket)':''));
+  const draws=Object.keys(e.koScores||{}).filter(k=>{const s=e.koScores[k];return s&&s.h===s.a&&!(e.koPens&&e.koPens[k]);}).length;
+  if(draws)iss.push(draws+' level KO tie(s) without a penalty pick');
+  if(!e.pinHash)iss.push('no PIN (unprotected)');
+  return iss;
+}
+function renderAudit(ids){
+  const names={};ids.forEach(id=>{const n=nameKey(state.entries[id].name);names[n]=(names[n]||0)+1;});
+  let bad=0,h='<div class="card" style="margin-top:14px"><h2>🔎 Entry audit ('+ids.length+')</h2>';
+  ids.map(id=>({id,e:state.entries[id]})).sort((a,b)=>(a.e.name||'').localeCompare(b.e.name||'')).forEach(({id,e})=>{
+    const iss=auditEntry(e);if(nameKey(e.name)&&names[nameKey(e.name)]>1)iss.push('duplicate name');
+    if(iss.length)bad++;
+    h+='<div style="padding:6px 0;border-top:1px solid var(--line);font-size:13px">'+(iss.length?'⚠️':'✅')+' <b>'+escapeHtml(e.name||'(no name)')+'</b> <span class="muted">'+id+'</span>'+(iss.length?' — <span style="color:#fde68a">'+iss.map(escapeHtml).join(' · ')+'</span>':' <span class="qual">complete</span>')+'</div>';
+  });
+  h+='<p class="muted" style="margin-top:8px">'+(bad?('⚠️ '+bad+' entr'+(bad===1?'y':'ies')+' with issues.'):'✅ All entries look complete.')+'</p></div>';
+  return h;
+}
+
 /* =========================== LEADERBOARD =========================== */
 function renderBoard(){
   const root=$('#board');const ids=Object.keys(state.entries);$('#entryCount').textContent=ids.length;
@@ -708,7 +733,9 @@ function renderBoard(){
   let h=`<table class="lb"><thead><tr><th>#</th><th>Player</th><th class="num">Grp</th><th class="num">WC</th><th class="num">KO</th><th class="num">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{const me=r.id===state.myId?' class="me"':'';const md=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
     h+=`<tr${me} style="cursor:pointer" onclick="showEntry('${r.id}')" title="View this entry"><td class="rank">${md}</td><td>${escapeHtml(r.name)}${r.id===state.myId?' <span class="muted">(you)</span>':''}</td><td class="num">${r.groupCorrect}</td><td class="num">${r.wcCorrect}</td><td class="num">${r.koCorrect}</td><td class="num total">${r.total}</td></tr>`;});
-  h+='</tbody></table>';root.innerHTML=h;
+  h+='</tbody></table>';
+  if(AUDIT)h+=renderAudit(ids);
+  root.innerHTML=h;
   const eb=$('#editEntry');if(eb)eb.classList.toggle('hide',!(state.myId&&state.entries[state.myId])||isLocked());
   const scored=Object.keys(state.results.matches).length;
   const rev=picksRevealed()?'tap a player to see their picks':"others' picks reveal 30 min before kickoff";
@@ -749,7 +776,6 @@ function loadEntryIntoForm(e){
   recomputeQualifiers();recomputeBracket();applyAll();saveDraft();
 }
 function editMyPicks(){const e=state.entries[state.myId];if(e)loadEntryIntoForm(e);closeModal();switchTab('picks');}
-function dismissNote(){const n=$('#updateNote');if(n)n.classList.add('hide');try{localStorage.setItem('wc_note_v2','1');}catch(e){}}
 function nameKey(s){return String(s||'').trim().toLowerCase();}
 function findEntryIdByName(nm){const k=nameKey(nm);if(!k)return null;return Object.keys(state.entries).find(id=>nameKey(state.entries[id].name)===k)||null;}
 function hashPin(p){p=String(p||'');let h=5381;for(let i=0;i<p.length;i++)h=((h<<5)+h+p.charCodeAt(i))>>>0;return 'p'+h.toString(36);}
@@ -922,7 +948,6 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
 /* =========================== INIT =========================== */
 (async function init(){
   renderPrizes();renderScoreRules();
-  if(localStorage.getItem('wc_note_v2'))$('#updateNote').classList.add('hide');
   $('#poolPill').textContent='🏷️ '+(GROUPLABEL+' pool');
   document.title='WC 2026 Pick\'em'+(' — '+GROUPLABEL);
   buildGroups();
