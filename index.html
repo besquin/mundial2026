@@ -203,6 +203,11 @@
 
   <!-- ===== PICKS ===== -->
   <section id="tab-picks">
+    <div id="updateNote" class="banner warn" style="position:relative;padding-right:34px">
+      <button onclick="dismissNote()" title="Dismiss" style="position:absolute;top:6px;right:8px;background:none;border:none;color:inherit;cursor:pointer;font-size:16px">✕</button>
+      🔄 <b>Heads up:</b> the knockout bracket now uses the <b>official FIFA 2026</b> structure. If you submitted before today, please re‑check your <b>knockout scores</b>.<br>
+      ✏️ <b>To make changes:</b> on this device tap <b>Edit my picks</b>. On another device (e.g. your phone), type your <b>same name + your PIN</b> and tap <b>↻ Load my entry</b>. New here? Choose a name + a <b>secret PIN</b>, fill everything in, then <b>Submit</b>.
+    </div>
     <div class="card" style="border-color:rgba(34,197,94,.55);box-shadow:0 8px 24px rgba(34,197,94,.18)">
       <h2>👤 Your name</h2>
       <p class="muted">This is how your entry shows up on the leaderboard — make it unique (e.g. add an emoji) so friends can tell entries apart. <b>Editing on a different device?</b> Type the same name and tap <b>Load my entry</b>.</p>
@@ -726,6 +731,7 @@ function loadEntryIntoForm(e){
   recomputeQualifiers();recomputeBracket();applyAll();saveDraft();
 }
 function editMyPicks(){const e=state.entries[state.myId];if(e)loadEntryIntoForm(e);closeModal();switchTab('picks');}
+function dismissNote(){const n=$('#updateNote');if(n)n.classList.add('hide');try{localStorage.setItem('wc_note_v2','1');}catch(e){}}
 function nameKey(s){return String(s||'').trim().toLowerCase();}
 function findEntryIdByName(nm){const k=nameKey(nm);if(!k)return null;return Object.keys(state.entries).find(id=>nameKey(state.entries[id].name)===k)||null;}
 function hashPin(p){p=String(p||'');let h=5381;for(let i=0;i<p.length;i++)h=((h<<5)+h+p.charCodeAt(i))>>>0;return 'p'+h.toString(36);}
@@ -898,6 +904,7 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
 /* =========================== INIT =========================== */
 (async function init(){
   renderPrizes();renderScoreRules();
+  if(localStorage.getItem('wc_note_v2'))$('#updateNote').classList.add('hide');
   $('#poolPill').textContent='🏷️ '+(GROUPLABEL+' pool');
   document.title='WC 2026 Pick\'em'+(' — '+GROUPLABEL);
   buildGroups();
