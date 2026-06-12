@@ -77,6 +77,12 @@
   .modalbox h3{margin:0 26px 10px 0;font-size:18px}
   .modalbox h4{margin:14px 0 4px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
   .modalbox p{margin:4px 0;font-size:14px}
+  .modalbox details>summary{cursor:pointer;color:var(--mut);font-size:13px;margin-top:12px;user-select:none}
+  .gsrow{font-size:12px;color:var(--mut);padding:1px 0}
+  .gsrow.hit{color:#bbf7d0;font-weight:600}
+  .gsrow.ok{color:#a7f3d0}
+  .gsrow.miss{color:#fecaca}
+  .modal-bracket{transform-origin:left top}
   .pred{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
   .pred .lbl{font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .mini{width:100%;font-size:13px;border-collapse:collapse;margin-top:6px}
@@ -532,7 +538,7 @@ function scoreEntry(e){
   let kC=0; const adv=bracketAdvancers(e);
   [['R16',S.r16],['QF',S.qf],['SF',S.sf],['F',S.finalist]].forEach(([rd,p])=>{const set=state.actual.ko[rd]||[];(adv[rd]||[]).forEach(c=>{if(set.includes(c)){pts+=p;kC++;}});});
   if(adv.champion&&state.actual.champion&&adv.champion===state.actual.champion){pts+=S.champion;kC++;}
-  const myThird=e.bracket&&e.bracket['B'];if(myThird&&state.actual.third&&myThird===state.actual.third){pts+=S.third;kC++;}
+  const myThird=e.bracket&&(e.bracket[BRONZEID]||e.bracket['B']);if(myThird&&state.actual.third&&myThird===state.actual.third){pts+=S.third;kC++;}
   // exact-tie bonus: a knockout match you predicted (both teams + the winner) actually happened
   let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.pair]=am.winner;});
   predictedTies(e).forEach(t=>{if(actM[t.pair]&&actM[t.pair]===t.winner){pts+=S.matchupBonus;bC++;}});
@@ -784,6 +790,63 @@ function renderBoard(){
 
 /* =========================== ENTRY VIEW (reveal-gated) =========================== */
 function closeModal(){const m=$('#entryModal');if(m)m.classList.add('hide');}
+// Read-only knockout box for a given entry (mirrors koMatchBox, no inputs).
+function entryKoBox(e,id,sm,actM){
+  const m=KOBYID[id];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);
+  const sc=(e.koScores&&e.koScores[id])||{};const w=(e.bracket||{})[id];
+  const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
+  const row=(code,side,val)=>{
+    const tag=posTag(side);
+    const cls='bteam'+(code?'':' empty')+(w&&w===code?' win':'')+(w&&w===code&&aw&&aw===code?' correct':'');
+    const tg=(code&&tag)?'<span class="postag">'+escapeHtml(tag)+'</span>':'';
+    return '<div class="'+cls+'"><div class="bteamL"><span>'+escapeHtml(code?fa(code):(tag||'?'))+'</span>'+tg+'</div><span class="res">'+(val!=null?val:'')+'</span></div>';
+  };
+  let h='<div class="bmatch">';
+  if(KODATE[id])h+='<div class="bdate">'+KODATE[id]+'</div>';
+  h+=row(a,m.a,sc.h)+row(b,m.b,sc.a);
+  const level=sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a);
+  if(level&&a&&b)h+='<div class="pens muted">'+(w?'⚖️ Pens: '+fa(w):'Level')+'</div>';
+  h+='</div>';
+  return h;
+}
+// Full read-only bracket tree for an entry (correct picks outlined green once results land).
+function entryBracketHtml(e){
+  const sm=seedMapFor(e);
+  const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
+  let h='<div class="bracket modal-bracket">';
+  KO_ROUNDS.forEach(rd=>{
+    h+='<div class="bcol'+(rd.key==='F'?' finalcol':'')+'"><h4>'+(rd.key==='F'?'🏆 Final':rd.label)+'</h4>';
+    rd.ids.forEach(id=>h+=entryKoBox(e,id,sm,actM));
+    h+='</div>';
+  });
+  const champ=(e.bracket||{})[FINID]||(e.bracket||{}).K31;
+  h+='<div class="champbox"><h4>Champion</h4><div class="champ'+(champ?'':' empty')+'">'+(champ?'🏆 '+fa(champ):'🏆 —')+'</div></div>';
+  h+='<div class="bcol bronzecol"><h4>🥉 3rd-place playoff</h4>'+entryKoBox(e,BRONZEID,sm,actM);
+  const bw=(e.bracket||{})[BRONZEID]||(e.bracket||{}).B;
+  if(bw)h+='<div class="pl">🥉 '+fa(bw)+'</div>';
+  h+='</div></div>';
+  return h;
+}
+// Per-match predicted score vs the actual result (🎯 exact · ✓ right result · ✗ miss).
+function groupScoresHtml(e){
+  return GLETTERS.map(g=>{
+    const rows=MATCHES.filter(m=>m.group===g).map(m=>{
+      const ps=e.scores&&e.scores[m.id];
+      const as=state.results.scores&&state.results.scores[m.id];
+      const ar=state.results.matches&&state.results.matches[m.id];
+      const pp=e.picks&&e.picks[m.id];
+      let mark='',cls='';
+      if(as){
+        if(ps&&ps.h===as.h&&ps.a===as.a){mark=' 🎯';cls='hit';}
+        else if(pp&&ar&&pp===ar){mark=' ✓';cls='ok';}
+        else{mark=' ✗';cls='miss';}
+      }
+      const act=as?' <span class="muted">→ '+as.h+'–'+as.a+'</span>':'';
+      return '<div class="gsrow '+cls+'">'+fa(m.home)+' <b>'+(ps?ps.h+'–'+ps.a:'·')+'</b> '+fa(m.away)+act+mark+'</div>';
+    }).join('');
+    return '<div style="margin-top:8px"><b>Group '+g+'</b></div>'+rows;
+  }).join('');
+}
 function showEntry(id){
   const e=state.entries[id];if(!e)return;const body=$('#modalBody');
   const iss=entryIssues(e);const issHtml=iss.length?('<div class="banner locked" style="margin:10px 0 0">🚩 <b>Needs fixing:</b> '+iss.map(escapeHtml).join(' · ')+'</div>'):'';
@@ -792,19 +855,22 @@ function showEntry(id){
     $('#entryModal').classList.remove('hide');return;
   }
   const adv=bracketAdvancers(e);const tl=a=>(a&&a.length)?a.map(fa).join(' · '):'—';
+  const haveRes=Object.keys(state.results.matches||{}).length>0;
+  const third=(e.bracket&&(e.bracket[BRONZEID]||e.bracket.B))||null;
   body.innerHTML=`<h3>${escapeHtml(e.name||'Entry')}${id===state.myId?' (you)':''}</h3>
     ${id===state.myId?('<div class="btnrow" style="margin-bottom:8px">'+(!isLocked()?'<button class="btn sm" onclick="editMyPicks()">✏️ Edit my picks</button>':'')+'<button class="btn ghost sm" onclick="copyEditLink()">🔗 Copy edit link (other devices)</button></div>'):''}
     ${issHtml}
     <p><b>🏆 Champion:</b> ${adv.champion?fa(adv.champion):'—'}</p>
     <p><b>🥈 Finalists:</b> ${tl(adv.F)}</p>
-    <p><b>🥉 3rd place:</b> ${(e.bracket&&e.bracket['B'])?fa(e.bracket['B']):'—'}</p>
+    <p><b>🥉 3rd place:</b> ${third?fa(third):'—'}</p>
     <p><b>Semi-finalists:</b> ${tl(adv.SF)}</p>
     <p><b>Quarter-finalists:</b> ${tl(adv.QF)}</p>
     <p><b>Round of 16:</b> ${tl(adv.R16)}</p>
     <h4>Groups — 1st / 2nd</h4>
     ${GLETTERS.map(g=>{const gp=e.groupPicks&&e.groupPicks[g];return `<p style="margin:2px 0">Grp ${g}: ${gp?(fa(gp.first)+' <span class="muted">/</span> '+fa(gp.second)):'—'}</p>`;}).join('')}
     <h4>Wild cards</h4><p>${tl(e.wildcards)}</p>
-    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Group match scores</summary>${GLETTERS.map(g=>'<div style="margin-top:8px"><b>Group '+g+'</b></div>'+MATCHES.filter(m=>m.group===g).map(m=>{const s=e.scores&&e.scores[m.id];return `<div class="muted" style="font-size:12px">${fa(m.home)} <b>${s?s.h+'–'+s.a:'·'}</b> ${fa(m.away)}</div>`;}).join('')).join('')}</details>`;
+    <details open><summary>🗺️ Full knockout tree</summary>${entryBracketHtml(e)}</details>
+    <details ${haveRes?'open':''}><summary>📋 Group match scores${haveRes?' vs results <span class="muted">(🎯 exact · ✓ result · ✗ miss)</span>':''}</summary>${groupScoresHtml(e)}</details>`;
   $('#entryModal').classList.remove('hide');
 }
 function loadEntryIntoForm(e){
