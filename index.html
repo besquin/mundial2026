@@ -330,14 +330,6 @@
 <div class="wrap">
   <header class="top">
     <h1 class="title"><span class="ball">⚽</span> <span class="tg">World Cup 2026 Pick'em</span></h1>
-    <p class="subtitle">Predict group standings, wild cards &amp; the full knockout bracket — auto-scored, live.</p>
-    <div class="hosts">🇨🇦 Canada · 🇲🇽 Mexico · 🇺🇸 USA · <b>2026</b></div>
-    <div class="statusbar">
-      <span class="pill" id="poolPill">🏷️ —</span>
-      <span class="pill"><span id="liveDot" class="live-dot off"></span><span id="liveText">Connecting…</span></span>
-      <span class="pill">🔒 Picks lock in <span id="clock" class="clock">—</span></span>
-      <span class="pill">👥 <span id="entryCount">0</span> players</span>
-    </div>
   </header>
 
   <div class="tabs">
@@ -1400,7 +1392,7 @@ function loadDraft(){try{const d=JSON.parse(localStorage.getItem('wc_draft_'+STO
 function toast(btn,msg){const o=btn.textContent;btn.textContent=msg;setTimeout(()=>btn.textContent=o,1200);}
 
 /* =========================== COUNTDOWN =========================== */
-function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){c.textContent='LOCKED';$('#lockBanner').classList.remove('hide');document.querySelectorAll('#groups input, #bracket input, #randomFill, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+function tickClock(){const diff=lockTime-Date.now();const c=$('#clock');if(diff<=0){if(c)c.textContent='LOCKED';const lb=$('#lockBanner');if(lb)lb.classList.remove('hide');document.querySelectorAll('#groups input, #bracket input, #randomFill, #clearPicks, #autoBracket, #clearBracket, #playerName, #submitBtn').forEach(n=>{n.disabled=true;});document.querySelectorAll('#wildcards .chip').forEach(n=>n.classList.add('ro'));return;}if(!c)return;const d=Math.floor(diff/864e5),h=Math.floor(diff/36e5)%24,m=Math.floor(diff/6e4)%60,s=Math.floor(diff/1e3)%60;c.textContent=(d?d+'d ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 
 /* =========================== RENDER static bits =========================== */
 function renderPrizes(){const ef=$('#entryFee');if(ef)ef.innerHTML='💵 Entry buy-in: <b style="color:var(--txt)">'+escapeHtml(CONFIG.entryFee||'')+'</b> per player';const e=$('#prizeList');if(!e)return;e.innerHTML=(CONFIG.prizes||[]).map(p=>`<div class="stat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;margin:0 0 8px"><b style="font-size:15px">${escapeHtml(p.place)}</b><span style="color:var(--txt)">${escapeHtml(p.prize)}</span></div>`).join('');}
@@ -1413,13 +1405,13 @@ function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<
   <li>Correct <b>🥉 3rd-place</b> winner: <b>+${S.third}</b></li>
   <li>Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet & you pick the winner)</li>
   <li>Max <b>${maxPoints()}</b> pts · auto-scored from a live feed</li></ul>`;}
-function setModeBanner(){const dot=$('#liveDot'),txt=$('#liveText'),b=$('#modeBanner');if(Store.mode==='cloud'||Store.mode==='pool'){dot.classList.remove('off');txt.textContent='Live · shared';b.className='banner ok';b.innerHTML='🟢 <b>Live shared mode.</b> One leaderboard for everyone, auto-scored — no manual entry.';}else{dot.classList.add('off');txt.textContent='Ready';b.className='banner warn';b.innerHTML='👋 <b>Welcome!</b> Fill your picks and hit <b>Submit</b> — that creates a shared pool and an invite link for friends.';}renderShare();}
+function setModeBanner(){const dot=$('#liveDot'),txt=$('#liveText'),b=$('#modeBanner');if(Store.mode==='cloud'||Store.mode==='pool'){if(dot)dot.classList.remove('off');if(txt)txt.textContent='Live · shared';b.className='banner ok';b.innerHTML='🟢 <b>Live shared mode.</b> One leaderboard for everyone, auto-scored — no manual entry.';}else{if(dot)dot.classList.add('off');if(txt)txt.textContent='Ready';b.className='banner warn';b.innerHTML='👋 <b>Welcome!</b> Fill your picks and hit <b>Submit</b> — that creates a shared pool and an invite link for friends.';}renderShare();}
 function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(url){$('#shareUrl').value=url;card.classList.remove('hide');}else card.classList.add('hide');if(Store.poolError){const b=$('#modeBanner');b.className='banner warn';b.innerHTML='⚠️ Couldn\'t reach the shared store — picks saved on this device. Use <b>Copy my pick code</b> to share, or try again later.';}}
 
 /* =========================== INIT =========================== */
 (async function init(){
   renderPrizes();renderScoreRules();
-  $('#poolPill').textContent='🏷️ '+(GROUPLABEL+' pool');
+  if($('#poolPill'))$('#poolPill').textContent='🏷️ '+(GROUPLABEL+' pool');
   document.title='WC 2026 Pick\'em'+(' — '+GROUPLABEL);
   buildGroups();
   if(ME)localStorage.setItem('wc_my_id_'+STOREKEY,ME);
