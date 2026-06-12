@@ -461,7 +461,8 @@
         </div>
         <select id="schedFilter" class="filt" aria-label="Filter matches">
           <option value="all">All Matches</option>
-          <option value="live">Live &amp; Upcoming</option>
+          <option value="today">Today's Matches</option>
+          <option value="upcoming">Upcoming</option>
           <option value="final">Completed</option>
         </select>
       </div>
@@ -1199,7 +1200,13 @@ function renderSchedule(){
   const dated=MATCHES.filter(m=>state.schedule[m.id]&&state.schedule[m.id].date)
     .sort((a,b)=>((state.schedule[a.id].date+(state.schedule[a.id].time||''))<(state.schedule[b.id].date+(state.schedule[b.id].time||''))?-1:1));
   const noOf={};dated.forEach((m,i)=>noOf[m.id]=i+1);
-  const pass=id=>{const k=schedStatus(state.schedule[id]).key;if(filt==='final')return k==='fin';if(filt==='live')return k!=='fin';return true;};
+  const today=new Date().toDateString();
+  const isToday=id=>{const sd=state.schedule[id];return !!(sd&&sd.date&&new Date(sd.date+'T12:00:00').toDateString()===today);};
+  const pass=id=>{const k=schedStatus(state.schedule[id]).key;
+    if(filt==='final')return k==='fin';
+    if(filt==='today')return isToday(id);
+    if(filt==='upcoming')return k!=='fin'&&k!=='ended';
+    return true;};
   let html='';
   for(const md of [1,2,3]){
     const ids=MATCHES.filter(m=>MATCHDAY(m.id)===md).map(m=>m.id);
@@ -1215,7 +1222,7 @@ function renderSchedule(){
   }
   // knockout cards (resolved fixtures from the live feed)
   const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
-  const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='live'?!fin:true);})
+  const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
     .map(km=>{const [x,y]=km.pair.split('|');const g=km.g||{};const fin=Number.isFinite(g[x])&&Number.isFinite(g[y]);
       const center=fin?('<div class="mc-score">'+g[x]+' <span>-</span> '+g[y]+'</div>'):'<div class="mc-vs">—<span>vs</span>—</div>';
       const stt=fin?{key:'fin',label:'Final'}:{key:'upc',label:'Upcoming'};
