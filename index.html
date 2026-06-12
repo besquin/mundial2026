@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>World Cup 2026 — Pick'em Pool ⚽</title><meta name="description" content="Predict the 2026 World Cup: group standings, wild cards, and the full knockout bracket. Auto-scored, live leaderboard." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
 <style>
   :root{
     --bg:#0b1020; --bg2:#111935; --card:#161f3d; --card2:#1d2950;
@@ -1270,21 +1271,19 @@ function _sdbMap(j){
       date:e.dateEventLocal||e.dateEvent||null,time:e.strTimeLocal||e.strTime||null,venue:e.strVenue||null,status:e.strStatus||null};
   }).filter(e=>e.home&&e.away&&e.stage);
 }
-// Fetch a URL directly; if the browser blocks it (CORS / network), retry through
-// a free public CORS proxy so the client can still read the public feed.
+// Fetch a URL directly; if the browser blocks it (CORS / 404 / network), retry
+// through several free public CORS proxies so the client can still read the feed.
 async function _sdbGet(url){
-  try{
-    const r=await fetch(url,{cache:'no-store'});
-    if(r.ok)return await r.json();
-    if(r.status!==0)throw new Error('HTTP '+r.status);
-  }catch(e){/* fall through to proxy (covers CORS "Failed to fetch") */}
+  try{const r=await fetch(url,{cache:'no-store'});if(r.ok)return await r.json();}catch(e){/* CORS / network → proxies */}
   const proxies=[
-    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
-    u=>'https://corsproxy.io/?url='+encodeURIComponent(u)
+    {u:'https://api.allorigins.win/raw?url='+encodeURIComponent(url),p:r=>r.json()},
+    {u:'https://api.allorigins.win/get?url='+encodeURIComponent(url),p:async r=>JSON.parse((await r.json()).contents)},
+    {u:'https://corsproxy.io/?url='+encodeURIComponent(url),p:r=>r.json()},
+    {u:'https://thingproxy.freeboard.io/fetch/'+url,p:r=>r.json()}
   ];
   let perr='blocked';
-  for(const p of proxies){
-    try{const r=await fetch(p(url),{cache:'no-store'});if(r.ok)return await r.json();perr='HTTP '+r.status;}
+  for(const px of proxies){
+    try{const r=await fetch(px.u,{cache:'no-store'});if(r.ok){const j=await px.p(r);if(j&&j.events!==undefined)return j;perr='bad payload';}else perr='HTTP '+r.status;}
     catch(e){perr=String(e.message||e);}
   }
   throw new Error(perr);
