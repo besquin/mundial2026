@@ -82,7 +82,12 @@
   .gsrow.hit{color:#bbf7d0;font-weight:600}
   .gsrow.ok{color:#a7f3d0}
   .gsrow.miss{color:#fecaca}
-  .modal-bracket{transform-origin:left top}
+  .koround{margin-top:6px}
+  .korlbl{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin:8px 0 2px}
+  .korow{font-size:13px;padding:2px 6px;border-radius:6px}
+  .korow.ok{background:rgba(34,197,94,.10)}
+  .korow.miss{background:rgba(239,68,68,.08)}
+  .ko-win{font-weight:700;color:#bbf7d0}
   .pred{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
   .pred .lbl{font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .mini{width:100%;font-size:13px;border-collapse:collapse;margin-top:6px}
@@ -790,42 +795,24 @@ function renderBoard(){
 
 /* =========================== ENTRY VIEW (reveal-gated) =========================== */
 function closeModal(){const m=$('#entryModal');if(m)m.classList.add('hide');}
-// Read-only knockout box for a given entry (mirrors koMatchBox, no inputs).
-function entryKoBox(e,id,sm,actM){
-  const m=KOBYID[id];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);
-  const sc=(e.koScores&&e.koScores[id])||{};const w=(e.bracket||{})[id];
-  const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
-  const row=(code,side,val)=>{
-    const tag=posTag(side);
-    const cls='bteam'+(code?'':' empty')+(w&&w===code?' win':'')+(w&&w===code&&aw&&aw===code?' correct':'');
-    const tg=(code&&tag)?'<span class="postag">'+escapeHtml(tag)+'</span>':'';
-    return '<div class="'+cls+'"><div class="bteamL"><span>'+escapeHtml(code?fa(code):(tag||'?'))+'</span>'+tg+'</div><span class="res">'+(val!=null?val:'')+'</span></div>';
-  };
-  let h='<div class="bmatch">';
-  if(KODATE[id])h+='<div class="bdate">'+KODATE[id]+'</div>';
-  h+=row(a,m.a,sc.h)+row(b,m.b,sc.a);
-  const level=sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a);
-  if(level&&a&&b)h+='<div class="pens muted">'+(w?'⚖️ Pens: '+fa(w):'Level')+'</div>';
-  h+='</div>';
-  return h;
-}
-// Full read-only bracket tree for an entry (correct picks outlined green once results land).
+// Full read-only knockout tree for an entry as a vertical, mobile-friendly
+// round-by-round list (winner highlighted; ✓/✗ vs the real result once played).
 function entryBracketHtml(e){
   const sm=seedMapFor(e);
   const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
-  let h='<div class="bracket modal-bracket">';
-  KO_ROUNDS.forEach(rd=>{
-    h+='<div class="bcol'+(rd.key==='F'?' finalcol':'')+'"><h4>'+(rd.key==='F'?'🏆 Final':rd.label)+'</h4>';
-    rd.ids.forEach(id=>h+=entryKoBox(e,id,sm,actM));
-    h+='</div>';
-  });
-  const champ=(e.bracket||{})[FINID]||(e.bracket||{}).K31;
-  h+='<div class="champbox"><h4>Champion</h4><div class="champ'+(champ?'':' empty')+'">'+(champ?'🏆 '+fa(champ):'🏆 —')+'</div></div>';
-  h+='<div class="bcol bronzecol"><h4>🥉 3rd-place playoff</h4>'+entryKoBox(e,BRONZEID,sm,actM);
-  const bw=(e.bracket||{})[BRONZEID]||(e.bracket||{}).B;
-  if(bw)h+='<div class="pl">🥉 '+fa(bw)+'</div>';
-  h+='</div></div>';
-  return h;
+  const rounds=[['Round of 32',R32IDS],['Round of 16',R16IDS],['Quarter-finals',QFIDS],['Semi-finals',SFIDS],['🏆 Final',[FINID]],['🥉 3rd-place playoff',[BRONZEID]]];
+  const tie=id=>{
+    const m=KOBYID[id];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);
+    const sc=(e.koScores&&e.koScores[id])||{};const w=(e.bracket||{})[id];
+    const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
+    const lvl=sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a);
+    const side=(code,val)=>'<span class="'+(w&&w===code?'ko-win':'')+'">'+escapeHtml(code?fa(code):'?')+(val!=null?' <b>'+val+'</b>':'')+'</span>';
+    const pen=lvl&&w?' <span class="muted">(pens '+fa(w)+')</span>':'';
+    const mark=aw?(w&&aw===w?' ✓':' ✗'):'';
+    const cls=aw?(w&&aw===w?'ok':'miss'):'';
+    return '<div class="korow '+cls+'">'+side(a,sc.h)+' <span class="muted">v</span> '+side(b,sc.a)+pen+mark+'</div>';
+  };
+  return rounds.map(([lbl,ids])=>'<div class="koround"><div class="korlbl">'+lbl+'</div>'+ids.map(tie).join('')+'</div>').join('');
 }
 // Per-match predicted score vs the actual result (🎯 exact · ✓ right result · ✗ miss).
 function groupScoresHtml(e){
