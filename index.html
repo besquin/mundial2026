@@ -21,6 +21,9 @@
   header.top{text-align:center;padding:18px 10px 6px}
   .title{font-size:30px;font-weight:800;letter-spacing:.3px;margin:0}
   .subtitle{color:var(--mut);margin:6px 0 0;font-size:14px}
+  .hdrstats{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0 0}
+  .hdrstats .hpill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:13px;color:var(--mut)}
+  .hdrstats .hpill b{color:var(--txt)}
   .pill{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--mut)}
   .statusbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:14px 0}
   .clock{font-variant-numeric:tabular-nums;font-weight:700;color:var(--txt)}
@@ -330,12 +333,13 @@
 <div class="wrap">
   <header class="top">
     <h1 class="title"><span class="ball">⚽</span> <span class="tg">World Cup 2026 Pick'em</span></h1>
+    <div id="hdrStats" class="hdrstats hide"></div>
   </header>
 
   <div class="tabs">
-    <button class="tab active" data-tab="results">📅 Schedule</button>
+    <button class="tab active" data-tab="board">🏆 Leaderboard</button>
+    <button class="tab" data-tab="results">📅 Schedule</button>
     <button class="tab" data-tab="picks">📝 My Picks</button>
-    <button class="tab" data-tab="board">🏆 Leaderboard</button>
   </div>
 
   <!-- ===== PICKS ===== -->
@@ -432,7 +436,7 @@
   </section>
 
   <!-- ===== LEADERBOARD ===== -->
-  <section id="tab-board" class="hide">
+  <section id="tab-board">
     <div class="lb-wrap">
       <div class="lb-main card">
         <div class="lb-head">
@@ -452,7 +456,7 @@
   </section>
 
   <!-- ===== LIVE RESULTS ===== -->
-  <section id="tab-results">
+  <section id="tab-results" class="hide">
     <div class="card">
       <div class="btnrow" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div class="subnav">
@@ -964,9 +968,24 @@ function renderBoard(){
   if(AUDIT)h+=renderAudit(ids);
   root.innerHTML=h;
   const eb=$('#editEntry');if(eb)eb.classList.toggle('hide',!(state.myId&&state.entries[state.myId])||isLocked());
-  renderChamps();renderRecent();renderYourRound();
+  renderChamps();renderRecent();renderYourRound();renderHeaderStats(rows);
   const scored=Object.keys(state.results.matches).length;
   $('#boardMeta').textContent='Top '+Math.min(10,ids.length)+' of '+ids.length+' entr'+(ids.length===1?'y':'ies')+(scored?' • live scoring':'');
+}
+function renderHeaderStats(rows){
+  const box=$('#hdrStats');if(!box)return;
+  rows=rows||poolRows();
+  const me=state.myId&&state.entries[state.myId]?rows.find(r=>r.id===state.myId):null;
+  if(!me){box.classList.add('hide');return;}
+  box.classList.remove('hide');
+  const rank=rows.findIndex(r=>r.id===me.id)+1;
+  const leader=rows[0];const gap=leader.total-me.total;
+  let vs;
+  if(rank===1)vs=rows.length>1?('leading by <b>'+(me.total-rows[1].total)+'</b>'):'first in';
+  else vs='<b>'+gap+'</b> behind 🥇 '+escapeHtml(leader.name);
+  box.innerHTML='<span class="hpill">🎯 You: <b>#'+rank+'</b> of '+rows.length+'</span>'+
+    '<span class="hpill">⭐ <b>'+me.total+'</b> pts</span>'+
+    '<span class="hpill">'+vs+'</span>';
 }
 function recentFinished(){
   const arr=MATCHES.filter(m=>{const sd=state.schedule[m.id];return sd&&schedStatus(sd).key==='fin'&&state.results.scores[m.id];})
@@ -1220,20 +1239,30 @@ function renderSchedule(){
     if(filt==='today')return isToday(id);
     if(filt==='upcoming')return k!=='fin'&&k!=='ended';
     return true;};
-  const MD=matchdayMap();
+  // group by calendar day
+  const fmtDay=d=>{const dt=new Date(d+'T12:00:00');return isNaN(dt)?d:dt.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});};
+  const byDay={};const noDay=[];
+  MATCHES.forEach(m=>{const sd=state.schedule[m.id];if(sd&&sd.date)(byDay[sd.date]=byDay[sd.date]||[]).push(m.id);else noDay.push(m.id);});
+  const todayKey=new Date().toISOString().slice(0,10);
   let html='';
-  for(const md of [1,2,3]){
-    const ids=MATCHES.filter(m=>MD[m.id]===md).map(m=>m.id);
-    const done=ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length;
+  const section=(title,ids,sub,collapse)=>{
     const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));
     const cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');
+    if(filt!=='all'&&!cards)return '';                       // hide empty days when filtering
+    const done=ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length;
     const pct=Math.round(done/ids.length*100);
-    html+='<div class="sched-sec" data-sec="md'+md+'">'+
-      '<div class="sec-head" onclick="toggleSec(this)"><div><h3>Group Stage — Matchday '+md+'</h3>'+
-      '<div class="sub">'+ids.length+' matches · '+done+'/'+ids.length+' completed</div>'+
+    return '<div class="sched-sec'+(collapse?' collapsed':'')+'">'+
+      '<div class="sec-head" onclick="toggleSec(this)"><div><h3>'+title+'</h3>'+
+      '<div class="sub">'+(sub||(ids.length+' match'+(ids.length===1?'':'es')+' · '+done+'/'+ids.length+' completed'))+'</div>'+
       '<div class="sec-prog"><i style="width:'+pct+'%"></i></div></div><span class="sec-chev">▾</span></div>'+
       '<div class="mgrid">'+(cards||'<p class="muted" style="grid-column:1/-1">No matches match this filter.</p>')+'</div></div>';
-  }
+  };
+  Object.keys(byDay).sort().forEach(day=>{
+    const ids=byDay[day];const done=ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length;
+    const collapse=(done===ids.length&&day<todayKey);          // fold finished past days
+    html+=section(fmtDay(day),ids,null,collapse);
+  });
+  if(noDay.length)html+=section('Group Stage',noDay,noDay.length+' matches · schedule loading…',false);
   // knockout cards (resolved fixtures from the live feed)
   const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
   const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
