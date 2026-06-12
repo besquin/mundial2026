@@ -1248,6 +1248,7 @@ function renderPoolSummary(){
   if(pot)tiles.push(['💰 Pot',pot]);
   box.innerHTML=tiles.map(([k,v,me])=>'<div class="pt'+(me?' me':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>').join('');
 }
+const _openSecs=new Set();   // schedule sections the user has expanded (collapsed by default)
 function renderSchedule(){
   renderPoolSummary();
   const root=$('#schedCards');if(!root)return;
@@ -1267,26 +1268,23 @@ function renderSchedule(){
   const fmtDay=d=>{const dt=new Date(d+'T12:00:00');return isNaN(dt)?d:dt.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});};
   const byDay={};const noDay=[];
   MATCHES.forEach(m=>{const sd=state.schedule[m.id];if(sd&&sd.date)(byDay[sd.date]=byDay[sd.date]||[]).push(m.id);else noDay.push(m.id);});
-  const todayKey=new Date().toISOString().slice(0,10);
   let html='';
-  const section=(title,ids,sub,collapse)=>{
-    const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));
-    const cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');
-    if(filt!=='all'&&!cards)return '';                       // hide empty days when filtering
-    const done=ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length;
-    const pct=Math.round(done/ids.length*100);
-    return '<div class="sched-sec'+(collapse?' collapsed':'')+'">'+
+  // collapsed by default; expanded only if the user opened it (persisted) — or when a filter is active
+  const isOpen=key=>filt!=='all'||_openSecs.has(key);
+  const section=(key,title,ids,sub,bodyHtml)=>{
+    let cards=bodyHtml;
+    if(cards==null){const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');}
+    if(filt!=='all'&&!cards)return '';                       // hide empty sections when filtering
+    const done=ids?ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length:0;
+    const pct=ids?Math.round(done/ids.length*100):0;
+    return '<div class="sched-sec'+(isOpen(key)?'':' collapsed')+'" data-sk="'+key+'">'+
       '<div class="sec-head" onclick="toggleSec(this)"><div><h3>'+title+'</h3>'+
       '<div class="sub">'+(sub||(ids.length+' match'+(ids.length===1?'':'es')+' · '+done+'/'+ids.length+' completed'))+'</div>'+
-      '<div class="sec-prog"><i style="width:'+pct+'%"></i></div></div><span class="sec-chev">▾</span></div>'+
+      (ids?'<div class="sec-prog"><i style="width:'+pct+'%"></i></div>':'')+'</div><span class="sec-chev">▾</span></div>'+
       '<div class="mgrid">'+(cards||'<p class="muted" style="grid-column:1/-1">No matches match this filter.</p>')+'</div></div>';
   };
-  Object.keys(byDay).sort().forEach(day=>{
-    const ids=byDay[day];const done=ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length;
-    const collapse=(done===ids.length&&day<todayKey);          // fold finished past days
-    html+=section(fmtDay(day),ids,null,collapse);
-  });
-  if(noDay.length)html+=section('Group Stage',noDay,noDay.length+' matches · schedule loading…',false);
+  Object.keys(byDay).sort().forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
+  if(noDay.length)html+=section('tbd','Group Stage',noDay,noDay.length+' matches · schedule loading…');
   // knockout cards (resolved fixtures from the live feed)
   const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
   const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
@@ -1295,10 +1293,10 @@ function renderSchedule(){
       const stt=fin?{key:'fin',label:'Final'}:{key:'upc',label:'Upcoming'};
       return '<div class="mcard s-'+stt.key+'"><div class="mc-top"><span class="mc-no">'+(koLabel[km.round]||km.round)+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
         '<div class="mc-teams">'+teamRow(x,'home')+center+teamRow(y,'away')+'</div></div>';}).join('');
-  if(koCards)html+='<div class="sched-sec"><div class="sec-head" onclick="toggleSec(this)"><div><h3>Knockout stage</h3><div class="sub">live results</div></div><span class="sec-chev">▾</span></div><div class="mgrid">'+koCards+'</div></div>';
+  if(koCards)html+=section('ko','Knockout stage',null,'live results',koCards);
   root.innerHTML=html;
 }
-function toggleSec(h){h.parentElement.classList.toggle('collapsed');}
+function toggleSec(h){const sec=h.parentElement;sec.classList.toggle('collapsed');const k=sec.getAttribute('data-sk');if(k){if(sec.classList.contains('collapsed'))_openSecs.delete(k);else _openSecs.add(k);}}
 function switchSub(name){
   document.querySelectorAll('.subtab').forEach(b=>b.classList.toggle('active',b.dataset.sub===name));
   ['schedule','standings'].forEach(k=>{const v=$('#subview-'+k);if(v)v.classList.toggle('hide',k!==name);});
