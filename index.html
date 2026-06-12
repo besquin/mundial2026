@@ -176,6 +176,42 @@
   .yr-row .yr-k{color:var(--mut);display:flex;align-items:center;gap:7px}
   .yr-row .yr-v{font-weight:800}
   .yr-foot{text-align:center;color:var(--mut);font-size:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+  /* ---- entry detail (modal) ---- */
+  .modalbox.wide{max-width:880px}
+  .emhead h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .emtabs{display:flex;gap:4px;background:var(--bg2);padding:4px;border-radius:11px;margin:12px 0}
+  .emtab{flex:1;background:transparent;border:0;color:var(--mut);padding:8px 6px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px}
+  .emtab.active{background:var(--card2);color:var(--txt)}
+  .emnote{font-size:12px;color:var(--mut);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+  .emlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-bottom:10px}
+  .emlegend .lg.ex{color:#86efac}.emlegend .lg.wk{color:var(--gold)}.emlegend .lg.wr{color:#fca5a5}
+  .emgrp{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+  .emgrp-h{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;background:var(--bg2)}
+  .emgrp-h h4{margin:0;font-size:15px;color:var(--txt);text-transform:none;letter-spacing:0;flex:1}
+  .emgrp-badge{width:26px;height:26px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--acc)}
+  .emgrp.collapsed .emgrp-b{display:none}
+  .emgrp.collapsed .sec-chev{transform:rotate(-90deg)}
+  .emgrp-b{padding:6px 10px 10px}
+  .emm{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0;background:var(--bg2)}
+  .emm.exact{border-left-color:var(--acc)}.emm.winok{border-left-color:var(--gold)}.emm.wrong{border-left-color:var(--red)}
+  .emm-meta{font-size:11px;color:var(--mut);display:flex;gap:12px;flex-wrap:wrap;margin-bottom:7px}
+  .emm-body{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+  .emm-team{display:flex;align-items:center;gap:9px;min-width:0}
+  .emm-team.home{justify-content:flex-end;text-align:right}
+  .emm-tn{display:flex;flex-direction:column;min-width:0}
+  .emm-team.away .emm-tn{align-items:flex-start}
+  .emm-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .emm-code{font-size:11px;color:var(--mut)}
+  .emm-flag{font-size:20px;width:32px;height:32px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .emm-sc{display:flex;align-items:center;gap:5px;justify-content:center}
+  .emm-box{min-width:30px;height:34px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line);border-radius:8px;font-size:16px;font-weight:800}
+  .emm-lk{font-size:12px}
+  .emm-act{font-size:11px;color:var(--mut);font-weight:700;margin-left:2px}
+  .emstat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  .emstat .es{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+  .emstat .esv{font-size:20px;font-weight:800}
+  .emstat .esk{font-size:11px;color:var(--mut);margin-top:2px}
+  @media(max-width:560px){.emstat{grid-template-columns:repeat(2,1fr)}.emm-name{font-size:13px}}
   .pred{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
   .pred .lbl{font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .mini{width:100%;font-size:13px;border-collapse:collapse;margin-top:6px}
@@ -452,7 +488,7 @@
     <div id="subview-standings" class="hide"><div class="card"><h2>Group standings</h2><p class="muted">Top 2 (green) qualify · best 8 third-placed (gold) are the wild cards.</p><div id="standings" class="grid2"></div></div></div>
   </section>
 
-  <div id="entryModal" class="modal hide"><div class="modalbox"><button class="modalx" id="modalClose">✕</button><div id="modalBody"></div></div></div>
+  <div id="entryModal" class="modal hide"><div class="modalbox" id="modalBox"><button class="modalx" id="modalClose">✕</button><div id="modalBody"></div></div></div>
 
   <p class="foot">Made for friends • Group draw &amp; opener per the official FIFA 2026 final draw • Bracket follows the official FIFA 2026 knockout structure • Results via live sports feed • Not affiliated with FIFA</p>
 </div>
@@ -989,50 +1025,82 @@ function entryBracketHtml(e){
   };
   return rounds.map(([lbl,ids])=>'<div class="koround"><div class="korlbl">'+lbl+'</div>'+ids.map(tie).join('')+'</div>').join('');
 }
-// Per-match predicted score vs the actual result (🎯 exact · ✓ right result · ✗ miss).
-function groupScoresHtml(e){
+// One group match row in the entry detail (colour-coded vs the real result).
+function emMatchRow(e,m,no){
+  const sd=state.schedule[m.id]||{};
+  const ps=e.scores&&e.scores[m.id];const as=state.results.scores&&state.results.scores[m.id];
+  const ar=state.results.matches&&state.results.matches[m.id];const pp=e.picks&&e.picks[m.id];
+  let cls='';if(as){if(ps&&ps.h===as.h&&ps.a===as.a)cls='exact';else if(pp&&ar&&pp===ar)cls='winok';else cls='wrong';}
+  const H=TEAM[m.home],A=TEAM[m.away];const rk=c=>RANK[c]?' <span class="emm-rk">#'+RANK[c]+'</span>':'';
+  const dt=sd.date?(fmtDate(sd.date)+(sd.time?', '+fmtTime(sd.time):'')):'';
+  const meta='<div class="emm-meta"><span>#'+no+'</span>'+(dt?'<span>🕐 '+dt+'</span>':'')+(sd.venue?'<span>📍 '+escapeHtml(sd.venue)+'</span>':'')+'</div>';
+  const lock=as?('<span class="emm-act">'+as.h+'-'+as.a+'</span>'):' <span class="emm-lk">🔒</span>';
+  return '<div class="emm '+cls+'">'+meta+
+    '<div class="emm-body">'+
+      '<div class="emm-team home"><span class="emm-tn"><span class="emm-name">'+escapeHtml(H[1])+'</span><span class="emm-code">'+m.home+rk(m.home)+'</span></span><span class="emm-flag">'+H[2]+'</span></div>'+
+      '<div class="emm-sc"><span class="emm-box">'+(ps?ps.h:'')+'</span><span class="emm-box">'+(ps?ps.a:'')+'</span>'+lock+'</div>'+
+      '<div class="emm-team away"><span class="emm-flag">'+A[2]+'</span><span class="emm-tn"><span class="emm-name">'+escapeHtml(A[1])+'</span><span class="emm-code">'+m.away+rk(m.away)+'</span></span></div>'+
+    '</div></div>';
+}
+function entryGroupStageHtml(e){
+  const note='<div class="emnote">ℹ️ <b>Tie-breaker note:</b> Goal differential and goals scored are used as tie-breakers and can affect which teams advance to the knockout stage.</div>';
+  const legend='<div class="emlegend"><span class="lg ex">● Winner + Score</span><span class="lg wk">● Correct Winner</span><span class="lg wr">● Incorrect</span></div>';
+  const groups=GLETTERS.map(g=>{
+    const rows=MATCHES.filter(m=>m.group===g).map((m,i)=>emMatchRow(e,m,i+1)).join('');
+    return '<div class="emgrp"><div class="emgrp-h" onclick="this.parentElement.classList.toggle(\'collapsed\')"><div class="emgrp-badge">'+g+'</div><h4>Group '+g+'</h4><span class="sec-chev">▾</span></div><div class="emgrp-b">'+rows+'</div></div>';
+  }).join('');
+  return note+legend+groups;
+}
+function entryStandingsHtml(e){
+  const tb=tableFromScores(e.scores||{});
   return GLETTERS.map(g=>{
-    const rows=MATCHES.filter(m=>m.group===g).map(m=>{
-      const ps=e.scores&&e.scores[m.id];
-      const as=state.results.scores&&state.results.scores[m.id];
-      const ar=state.results.matches&&state.results.matches[m.id];
-      const pp=e.picks&&e.picks[m.id];
-      let mark='',cls='';
-      if(as){
-        if(ps&&ps.h===as.h&&ps.a===as.a){mark=' 🎯';cls='hit';}
-        else if(pp&&ar&&pp===ar){mark=' ✓';cls='ok';}
-        else{mark=' ✗';cls='miss';}
-      }
-      const act=as?' <span class="muted">→ '+as.h+'–'+as.a+'</span>':'';
-      return '<div class="gsrow '+cls+'">'+fa(m.home)+' <b>'+(ps?ps.h+'–'+ps.a:'·')+'</b> '+fa(m.away)+act+mark+'</div>';
-    }).join('');
-    return '<div style="margin-top:8px"><b>Group '+g+'</b></div>'+rows;
+    const rows=tb[g].map((r,i)=>{const cls=i===0?'p1':(i===1?'p2':'');const tag=i===0?'<span class="tag t1">1st</span>':(i===1?'<span class="tag t2">2nd</span>':'');
+      return '<tr class="'+cls+'"><td>'+(i+1)+'</td><td>'+fa(r.code)+' '+tag+'</td><td class="num">'+r.pts+'p</td><td class="num">'+(r.gd>0?'+':'')+r.gd+'</td></tr>';}).join('');
+    return '<div class="emgrp"><div class="emgrp-h"><div class="emgrp-badge">'+g+'</div><h4>Group '+g+'</h4></div><div class="emgrp-b" style="padding:6px 12px 10px"><table class="mini"><tbody>'+rows+'</tbody></table></div></div>';
   }).join('');
 }
+function entrySummaryHtml(e){
+  const adv=bracketAdvancers(e);const tl=a=>(a&&a.length)?a.map(fa).join(' · '):'—';
+  const third=(e.bracket&&(e.bracket[BRONZEID]||e.bracket.B))||null;
+  const haveRes=Object.keys(state.results.matches||{}).length>0;const s=scoreEntry(e);
+  const stat=haveRes?('<div class="emstat"><div class="es"><div class="esv" style="color:var(--gold)">'+s.total+'</div><div class="esk">Total pts</div></div><div class="es"><div class="esv">'+s.groupPts+'</div><div class="esk">Group</div></div><div class="es"><div class="esv">'+s.koPts+'</div><div class="esk">Knockout</div></div><div class="es"><div class="esv">'+s.exactScores+'</div><div class="esk">Exact 🎯</div></div></div>'):'';
+  return stat+
+    '<p><b>🏆 Champion:</b> '+(adv.champion?fa(adv.champion):'—')+'</p>'+
+    '<p><b>🥈 Finalists:</b> '+tl(adv.F)+'</p>'+
+    '<p><b>🥉 3rd place:</b> '+(third?fa(third):'—')+'</p>'+
+    '<p><b>Semi-finalists:</b> '+tl(adv.SF)+'</p>'+
+    '<p><b>Quarter-finalists:</b> '+tl(adv.QF)+'</p>'+
+    '<p><b>Round of 16:</b> '+tl(adv.R16)+'</p>'+
+    '<h4>Groups — 1st / 2nd</h4>'+GLETTERS.map(g=>{const gp=e.groupPicks&&e.groupPicks[g];return '<p style="margin:2px 0">Grp '+g+': '+(gp&&gp.first?fa(gp.first)+' <span class="muted">/</span> '+fa(gp.second):'—')+'</p>';}).join('')+
+    '<h4>Wild cards</h4><p>'+tl(e.wildcards)+'</p>';
+}
+function emTab(name){
+  document.querySelectorAll('#modalBody .emtab').forEach(b=>b.classList.toggle('active',b.dataset.em===name));
+  ['group','standings','ko','summary'].forEach(k=>{const v=document.getElementById('em-'+k);if(v)v.classList.toggle('hide',k!==name);});
+}
 function showEntry(id){
-  const e=state.entries[id];if(!e)return;const body=$('#modalBody');
+  const e=state.entries[id];if(!e)return;const body=$('#modalBody');const box=$('#modalBox');
   const iss=entryIssues(e);const issHtml=iss.length?('<div class="banner locked" style="margin:10px 0 0">🚩 <b>Needs fixing:</b> '+iss.map(escapeHtml).join(' · ')+'</div>'):'';
   if(id!==state.myId && !picksRevealed()){
+    if(box)box.classList.remove('wide');
     body.innerHTML=`<h3>🔒 Picks hidden</h3><p class="muted">${escapeHtml(e.name||'This player')}'s picks unlock <b>30 minutes before kickoff</b> — ${new Date(revealTime).toLocaleString()}. After that, every entry stays visible for the whole tournament.</p>`+issHtml;
     $('#entryModal').classList.remove('hide');return;
   }
-  const adv=bracketAdvancers(e);const tl=a=>(a&&a.length)?a.map(fa).join(' · '):'—';
-  const haveRes=Object.keys(state.results.matches||{}).length>0;
-  const third=(e.bracket&&(e.bracket[BRONZEID]||e.bracket.B))||null;
-  body.innerHTML=`<h3>${escapeHtml(e.name||'Entry')}${id===state.myId?' (you)':''}</h3>
-    ${id===state.myId?('<div class="btnrow" style="margin-bottom:8px">'+(!isLocked()?'<button class="btn sm" onclick="editMyPicks()">✏️ Edit my picks</button>':'')+'<button class="btn ghost sm" onclick="copyEditLink()">🔗 Copy edit link (other devices)</button></div>'):''}
-    ${issHtml}
-    <p><b>🏆 Champion:</b> ${adv.champion?fa(adv.champion):'—'}</p>
-    <p><b>🥈 Finalists:</b> ${tl(adv.F)}</p>
-    <p><b>🥉 3rd place:</b> ${third?fa(third):'—'}</p>
-    <p><b>Semi-finalists:</b> ${tl(adv.SF)}</p>
-    <p><b>Quarter-finalists:</b> ${tl(adv.QF)}</p>
-    <p><b>Round of 16:</b> ${tl(adv.R16)}</p>
-    <h4>Groups — 1st / 2nd</h4>
-    ${GLETTERS.map(g=>{const gp=e.groupPicks&&e.groupPicks[g];return `<p style="margin:2px 0">Grp ${g}: ${gp?(fa(gp.first)+' <span class="muted">/</span> '+fa(gp.second)):'—'}</p>`;}).join('')}
-    <h4>Wild cards</h4><p>${tl(e.wildcards)}</p>
-    <details open><summary>🗺️ Full knockout tree</summary>${entryBracketHtml(e)}</details>
-    <details ${haveRes?'open':''}><summary>📋 Group match scores${haveRes?' vs results <span class="muted">(🎯 exact · ✓ result · ✗ miss)</span>':''}</summary>${groupScoresHtml(e)}</details>`;
+  if(box)box.classList.add('wide');
+  const nat=entryNat(e);const mine=id===state.myId;
+  const gpDone=GLETTERS.filter(g=>e.groupPicks&&e.groupPicks[g]&&e.groupPicks[g].first).length;
+  const gpPct=Math.round(gpDone/12*100);
+  const koPct=Math.round(Object.keys(e.bracket||{}).filter(k=>KOIDSET.has(k)&&e.bracket[k]).length/TOTAL_TIES*100);
+  body.innerHTML=
+    '<div class="emhead"><h3 style="margin:0">'+escapeHtml(e.name||'Entry')+(nat?' <span class="natbadge">'+TEAM[nat][2]+' '+nat+'</span>':'')+(mine?' <span class="muted">(you)</span>':'')+'</h3>'+
+      '<div class="muted" style="font-size:12px;margin-top:3px">FIFA World Cup 2026 · Groups <b>'+gpPct+'%</b> · Knockout <b>'+koPct+'%</b></div></div>'+
+    (mine?('<div class="btnrow" style="margin:8px 0">'+(!isLocked()?'<button class="btn sm" onclick="editMyPicks()">✏️ Edit my picks</button>':'')+'<button class="btn ghost sm" onclick="copyEditLink()">🔗 Copy edit link</button></div>'):'')+
+    issHtml+
+    '<div class="emtabs"><button class="emtab active" data-em="group" onclick="emTab(\'group\')">Group Stage</button><button class="emtab" data-em="standings" onclick="emTab(\'standings\')">Standings</button><button class="emtab" data-em="ko" onclick="emTab(\'ko\')">Knockout</button><button class="emtab" data-em="summary" onclick="emTab(\'summary\')">Summary</button></div>'+
+    '<div id="em-group">'+entryGroupStageHtml(e)+'</div>'+
+    '<div id="em-standings" class="hide">'+entryStandingsHtml(e)+'</div>'+
+    '<div id="em-ko" class="hide">'+entryBracketHtml(e)+'</div>'+
+    '<div id="em-summary" class="hide">'+entrySummaryHtml(e)+'</div>';
   $('#entryModal').classList.remove('hide');
 }
 function loadEntryIntoForm(e){
