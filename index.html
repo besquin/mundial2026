@@ -327,6 +327,30 @@
   .scrollhint{display:none}
   @media(max-width:760px){.scrollhint{display:block;text-align:center;color:var(--mut);font-size:12px;margin:2px 0 8px}}
   @media(max-width:560px){.gin{width:54px;padding:10px 6px;font-size:16px}.bgin{width:46px;padding:8px 4px;font-size:15px}.title{font-size:26px}}
+  /* ---------------- mobile polish ---------------- */
+  button,.tab,.subtab,.lbrow,.mcard,.sec-head{-webkit-tap-highlight-color:transparent}
+  @media(max-width:600px){
+    .wrap{padding:12px 11px 76px}
+    .tabs{position:sticky;top:6px;z-index:30;margin:6px auto 16px;background:rgba(22,31,61,.93);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .tab{padding:11px 6px;font-size:13px;min-height:44px}
+    .title{font-size:22px}
+    .hdrstats{gap:6px}.hdrstats .hpill{font-size:12px;padding:5px 10px}
+    .card{padding:14px 13px}
+    .mcard{padding:12px 13px}.mc-name{font-size:14px}.mc-flag{width:30px;height:30px;font-size:19px}
+    .mc-pred{margin-top:10px}.mc-foot{gap:10px}
+    .sec-head{padding:12px 13px}.sec-head h3{font-size:15px}
+    .lbrow{padding:11px 12px;gap:10px}.lbr-rank{width:34px;height:34px;font-size:13px}
+    .lbr-name{font-size:14px}.lbr-pts b{font-size:18px}
+    .subnav{flex:1}.subtab{flex:1;min-height:42px}
+    .filt,.lb-search{font-size:16px}                 /* 16px stops iOS from zooming on focus */
+    .modal{padding:7px}
+    .modalbox,.modalbox.wide{max-width:100%;max-height:94vh;padding:16px 14px}
+    .emtabs{position:sticky;top:0;z-index:3;background:var(--card);margin:10px -2px;border-radius:11px}
+    .emtab{font-size:12px;padding:9px 4px;min-height:40px}
+    .emm-flag{width:28px;height:28px;font-size:18px}.emm-name{font-size:12px}
+    .emm-box{min-width:26px;height:30px;font-size:14px}.emm-body{gap:6px}
+    .emstat .esv{font-size:18px}
+  }
 </style>
 </head>
 <body>
@@ -1470,7 +1494,9 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
   Store.onEntries(d=>{state.entries=d||{};renderBoard();renderSchedule();if(ME&&!_meLoaded&&state.entries[state.myId]){_meLoaded=true;loadEntryIntoForm(state.entries[state.myId]);switchTab('picks');}});
   await Store.init();setModeBanner();
   tickClock();setInterval(tickClock,1000);
-  fetchLive();setInterval(fetchLive,CONFIG.pollMs);
+  fetchLive();
+  setInterval(()=>{if(!document.hidden)fetchLive();},CONFIG.pollMs);          // skip polling while backgrounded
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)fetchLive();}); // refresh on return
 })();
 </script>
 </body>
