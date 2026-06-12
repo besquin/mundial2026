@@ -465,7 +465,6 @@
       <div class="btnrow" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div class="subnav">
           <button class="subtab active" data-sub="schedule">📅 Schedule</button>
-          <button class="subtab" data-sub="draw">🧬 Draw</button>
           <button class="subtab" data-sub="standings">📊 Standings</button>
         </div>
         <select id="schedFilter" class="filt" aria-label="Filter matches">
@@ -479,7 +478,6 @@
       <p class="muted" id="resProgTxt" style="margin-top:8px">0 / 72 group matches played</p>
     </div>
     <div id="subview-schedule"><div id="poolSummary" class="psum"></div><div id="schedCards"></div></div>
-    <div id="subview-draw" class="hide"><div class="card"><h2>Knockout progress</h2><p class="muted">Live bracket — teams advance automatically as results come in.</p><div id="koLive"></div></div></div>
     <div id="subview-standings" class="hide"><div class="card"><h2>Group standings</h2><p class="muted">Top 2 (green) qualify · best 8 third-placed (gold) are the wild cards.</p><div id="standings" class="grid2"></div></div></div>
   </section>
 
@@ -1141,12 +1139,6 @@ function renderResults(){
     arr.forEach((t,i)=>{const cls=i<2?'qual':(state.proj.includes(t.code)?'wild':'');h+=`<tr><td>${i+1}</td><td class="${cls}">${fa(t.code)}</td><td class="num">${t.p||0}</td><td class="num">${(t.gd>0?'+':'')+(t.gd||0)}</td><td class="num"><b>${t.pts||0}</b></td></tr>`;});
     h+='</tbody></table>';const body=el('div');body.style.padding='4px 10px 10px';body.innerHTML=h;wrap.appendChild(body);root.appendChild(wrap);
   }
-  // knockout live
-  const ko=$('#koLive');const stt=[['R16','Round of 16'],['QF','Quarter-finals'],['SF','Semi-finals'],['F','Finalists']];
-  let kh='';stt.forEach(([k,lbl])=>{const set=state.actual.ko[k]||[];kh+=`<div style="margin:6px 0"><b>${lbl}:</b> ${set.length?set.map(fa).join(' · '):'<span class="muted">—</span>'}</div>`;});
-  kh+=`<div style="margin:6px 0"><b>🥉 Third place:</b> ${state.actual.third?fa(state.actual.third):'<span class="muted">—</span>'}</div>`;
-  kh+=`<div style="margin:6px 0"><b>🏆 Champion:</b> ${state.actual.champion?fa(state.actual.champion):'<span class="muted">—</span>'}</div>`;
-  ko.innerHTML=kh;
   // reflect group match results onto picks chips
   for(const m of MATCHES){const chip=$('#rc-'+m.id);if(!chip)continue;const r=state.results.matches[m.id];if(!r){chip.classList.add('hide');continue;}chip.classList.remove('hide');const as=state.results.scores[m.id];const sTxt=as?(as.h+'–'+as.a):'';const mine=state.picks[m.id];const ms=state.scores[m.id];const exact=ms&&as&&ms.h===as.h&&ms.a===as.a;chip.textContent='Result '+sTxt;chip.className='res-chip '+(exact?'hit':(mine?(mine===r?'hit':'miss'):''));chip.title=exact?'Exact score! 🎯':'';}
   ALL_TEAMS.forEach(t=>{const c=$('#wc-'+t[0]);if(c)c.classList.toggle('win',state.proj.includes(t[0]));});
@@ -1243,7 +1235,7 @@ function renderSchedule(){
 function toggleSec(h){h.parentElement.classList.toggle('collapsed');}
 function switchSub(name){
   document.querySelectorAll('.subtab').forEach(b=>b.classList.toggle('active',b.dataset.sub===name));
-  ['schedule','draw','standings'].forEach(k=>{const v=$('#subview-'+k);if(v)v.classList.toggle('hide',k!==name);});
+  ['schedule','standings'].forEach(k=>{const v=$('#subview-'+k);if(v)v.classList.toggle('hide',k!==name);});
 }
 
 /* =========================== LIVE FEED =========================== */
