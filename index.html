@@ -536,7 +536,20 @@ const GLETTERS=Object.keys(GROUPS);
 /* Approx. FIFA world ranking (cosmetic, shown on schedule cards) */
 const RANK={ARG:1,ESP:2,FRA:3,ENG:4,BRA:5,NED:6,POR:7,MAR:8,GER:9,CRO:10,BEL:11,COL:13,URU:14,USA:15,MEX:16,JPN:17,SUI:18,SEN:19,IRN:20,KOR:22,ECU:23,AUT:24,TUR:25,AUS:27,CAN:29,NOR:30,EGY:31,SWE:33,SCO:36,ALG:38,PAN:39,PAR:40,CIV:41,CZE:44,TUN:49,UZB:53,COD:55,QAT:56,IRQ:57,SAU:58,RSA:61,JOR:62,CPV:70,BIH:71,GHA:72,CUW:82,HAI:84,NZL:86};
 const MBYID={};MATCHES.forEach(m=>MBYID[m.id]=m);
-const MATCHDAY=id=>Math.ceil(Number(String(id).slice(1))/2);   // group RR -> matchday 1/2/3
+const MATCHDAY=id=>Math.ceil(Number(String(id).slice(1))/2);   // fallback before the feed loads
+// Real matchday per match: within a group, the 2 earliest kickoffs = MD1, next 2 = MD2, last 2 = MD3.
+function matchdayMap(){
+  const md={};
+  GLETTERS.forEach(g=>{
+    const ms=MATCHES.filter(m=>m.group===g);
+    const keyed=ms.every(m=>state.schedule&&state.schedule[m.id]&&state.schedule[m.id].date);
+    if(keyed){
+      const k=m=>{const s=state.schedule[m.id];return s.date+(s.time||'');};
+      ms.slice().sort((a,b)=>k(a)<k(b)?-1:1).forEach((m,i)=>md[m.id]=Math.ceil((i+1)/2));
+    } else ms.forEach(m=>md[m.id]=MATCHDAY(m.id));
+  });
+  return md;
+}
 
 /* OFFICIAL 2026 knockout bracket (FIFA). Third-placed slots accept a 3rd from the listed groups. */
 const THIRD_GROUPS={'3a':'ABCDF','3b':'CDFGH','3c':'CEFHI','3d':'EHIJK','3e':'BEFIJ','3f':'AEHIJ','3g':'EFGIJ','3h':'DEIJL'};
@@ -969,12 +982,12 @@ function renderRecent(){
     arr.slice(0,6).map(x=>{const m=x.m,sc=x.sc;
       return '<div class="rr-row"><span class="rr-t">'+TEAM[m.home][2]+' '+escapeHtml(TEAM[m.home][1])+'</span><span class="rr-sc">'+sc.h+' - '+sc.a+'</span><span class="rr-t">'+escapeHtml(TEAM[m.away][1])+' '+TEAM[m.away][2]+'</span></div>';}).join('');
 }
-function activeMatchday(){for(const md of [1,2,3]){const ids=MATCHES.filter(m=>MATCHDAY(m.id)===md).map(m=>m.id);if(ids.filter(id=>state.results.matches[id]).length<ids.length)return md;}return 3;}
+function activeMatchday(){const MD=matchdayMap();for(const md of [1,2,3]){const ids=MATCHES.filter(m=>MD[m.id]===md).map(m=>m.id);if(ids.filter(id=>state.results.matches[id]).length<ids.length)return md;}return 3;}
 function renderYourRound(){
   const box=$('#roundBody');if(!box)return;
   const e=state.myId&&state.entries[state.myId];
   if(!e){box.innerHTML='<span class="muted">Submit an entry to track your round.</span>';return;}
-  const S=CONFIG.scoring;const md=activeMatchday();const ids=MATCHES.filter(m=>MATCHDAY(m.id)===md).map(m=>m.id);
+  const S=CONFIG.scoring;const md=activeMatchday();const MD=matchdayMap();const ids=MATCHES.filter(m=>MD[m.id]===md).map(m=>m.id);
   let pts=0,corr=0,exact=0,done=0,best=null;
   ids.forEach(id=>{const r=state.results.matches[id];if(!r)return;done++;let mp=0;
     if(e.picks&&e.picks[id]===r){pts+=S.match;corr++;mp+=S.match;}
@@ -1207,9 +1220,10 @@ function renderSchedule(){
     if(filt==='today')return isToday(id);
     if(filt==='upcoming')return k!=='fin'&&k!=='ended';
     return true;};
+  const MD=matchdayMap();
   let html='';
   for(const md of [1,2,3]){
-    const ids=MATCHES.filter(m=>MATCHDAY(m.id)===md).map(m=>m.id);
+    const ids=MATCHES.filter(m=>MD[m.id]===md).map(m=>m.id);
     const done=ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length;
     const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));
     const cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');
