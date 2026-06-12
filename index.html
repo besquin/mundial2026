@@ -140,6 +140,16 @@
   .mc-pct .ph{color:#86efac}.mc-pct .pd{color:var(--mut)}.mc-pct .pa{color:#fca5a5}
   .mc-pn{text-align:center;font-size:10px;color:var(--mut);margin-top:6px}
   .mc-foot{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--mut)}
+  .mcard.click{cursor:pointer;transition:border-color .15s,transform .08s}
+  .mcard.click:hover{border-color:#33457a}.mcard.click:active{transform:scale(.995)}
+  .mp-list{margin-top:12px}
+  .mp-row{display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid var(--line);cursor:pointer}
+  .mp-row:first-child{border-top:0}
+  .mp-row:hover{background:rgba(255,255,255,.03)}
+  .mp-name{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mp-sc{font-weight:800;font-variant-numeric:tabular-nums;min-width:54px;text-align:right}
+  .mp-mk{width:58px;text-align:right;font-size:13px}
+  .mp-row.hit .mp-sc{color:#bbf7d0}.mp-row.ok .mp-sc{color:#fde68a}.mp-row.miss .mp-sc{color:#fca5a5}
   .psum{display:grid;grid-template-columns:repeat(auto-fit,minmax(116px,1fr));gap:10px;margin-bottom:14px}
   .psum .pt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
   .psum .pt .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
@@ -1228,9 +1238,39 @@ function groupCard(id,no){
   } else pred='<div class="mc-pred"><div class="mc-pn">No pool picks yet</div></div>';
   const fb=[];if(sd.date)fb.push('📅 '+fmtDate(sd.date));if(sd.time)fb.push('🕐 '+fmtTime(sd.time));if(sd.venue)fb.push('📍 '+escapeHtml(sd.venue));
   const foot=fb.length?'<div class="mc-foot">'+fb.map(x=>'<span>'+x+'</span>').join('')+'</div>':'';
-  return '<div class="mcard s-'+stt.key+'">'+
+  return '<div class="mcard click s-'+stt.key+'" onclick="showMatchPredictions(\''+id+'\')">'+
     '<div class="mc-top"><span class="mc-no">'+(no?('Match '+no):('Group '+m.group))+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
     '<div class="mc-teams">'+teamRow(m.home,'home')+center+teamRow(m.away,'away')+'</div>'+pred+foot+'</div>';
+}
+// Per-player predicted scores for one group match (opens when a card is tapped).
+function showMatchPredictions(id){
+  const m=MBYID[id];if(!m)return;const H=TEAM[m.home],A=TEAM[m.away];
+  const body=$('#modalBody');const box=$('#modalBox');if(box)box.classList.remove('wide');
+  if(!picksRevealed()){
+    body.innerHTML='<h3>🔒 Picks hidden</h3><p class="muted">Everyone’s predictions for this match unlock <b>30 minutes before kickoff</b>.</p>';
+    $('#entryModal').classList.remove('hide');return;
+  }
+  const sd=state.schedule[id]||{};const stt=schedStatus(sd);
+  const as=state.results.scores[id];const ar=state.results.matches[id];const S=CONFIG.scoring;
+  const rows=Object.keys(state.entries).map(eid=>{
+    const e=state.entries[eid];const ps=e.scores&&e.scores[id];const pp=e.picks&&e.picks[id];
+    let pts=0,mark='',cls='';
+    if(as){
+      if(ps&&ps.h===as.h&&ps.a===as.a){pts=S.match+S.exactScore;mark='🎯';cls='hit';}
+      else if(pp&&ar&&pp===ar){pts=S.match;mark='✓';cls='ok';}
+      else{mark='✗';cls='miss';}
+    }
+    return{id:eid,name:e.name||'Anon',ps,pts,mark,cls};
+  }).sort((a,b)=>b.pts-a.pts||a.name.localeCompare(b.name));
+  const sub=(sd.date?fmtDate(sd.date)+(sd.time?' · '+fmtTime(sd.time):''):'')+(as?' · <b style="color:var(--txt)">Result '+as.h+'–'+as.a+'</b>':' · '+stt.label);
+  const list=rows.map(r=>'<div class="mp-row '+r.cls+'" onclick="showEntry(\''+r.id+'\')">'+
+    '<span class="mp-name">'+escapeHtml(r.name)+'</span>'+
+    '<span class="mp-sc">'+(r.ps?r.ps.h+' – '+r.ps.a:'—')+'</span>'+
+    '<span class="mp-mk">'+(r.mark||'')+(as&&r.pts?' <span class="muted">+'+r.pts+'</span>':'')+'</span></div>').join('');
+  body.innerHTML='<h3>'+H[2]+' '+escapeHtml(H[1])+' <span class="muted">vs</span> '+escapeHtml(A[1])+' '+A[2]+'</h3>'+
+    '<div class="muted" style="font-size:12px;margin-top:2px">'+sub+'</div>'+
+    '<div class="mp-list">'+list+'</div>';
+  $('#entryModal').classList.remove('hide');
 }
 function renderPoolSummary(){
   const box=$('#poolSummary');if(!box)return;
