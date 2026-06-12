@@ -963,6 +963,7 @@ function renderAudit(ids){
 function poolRows(){
   const rows=Object.keys(state.entries).map(id=>{const e=state.entries[id];return{id,name:e.name||'Anon',...scoreEntry(e),at:e.createdAt||0};});
   rows.sort((a,b)=>b.total-a.total||(b.groupCorrect+b.wcCorrect+b.koCorrect)-(a.groupCorrect+a.wcCorrect+a.koCorrect)||a.at-b.at);
+  rows.forEach((r,i)=>{r._rank=(i>0&&rows[i-1].total===r.total)?rows[i-1]._rank:i+1;});   // ties share a rank
   return rows;
 }
 function entryNat(e){const b=(e&&e.bracket)||{};return b[FINID]||b.K31||null;}   // champion pick = country badge
@@ -972,7 +973,6 @@ function renderBoard(){
   if(!ids.length){root.innerHTML='<div class="empty">No entries yet. Be the first! 🥇</div>';renderRecent();renderYourRound();return;}
   const ptOf=r=>r.total;
   const rows=poolRows();
-  rows.forEach((r,i)=>r._rank=i+1);
   const rowHtml=r=>{
     const e=state.entries[r.id];const nat=entryNat(e);
     const badge=nat?('<span class="natbadge">'+TEAM[nat][2]+' '+nat+'</span>'):'';
@@ -999,11 +999,11 @@ function renderHeaderStats(rows){
   const me=state.myId&&state.entries[state.myId]?rows.find(r=>r.id===state.myId):null;
   if(!me){box.classList.add('hide');return;}
   box.classList.remove('hide');
-  const rank=rows.findIndex(r=>r.id===me.id)+1;
+  const rank=me._rank;const tied=rows.filter(r=>r.total===me.total).length>1;
   const leader=rows[0];const gap=leader.total-me.total;
   let vs;
-  if(rank===1)vs=rows.length>1?('leading by <b>'+(me.total-rows[1].total)+'</b>'):'first in';
-  else vs='<b>'+gap+'</b> behind 🥇 '+escapeHtml(leader.name);
+  if(rank===1)vs=tied?'🤝 tied for <b>1st</b>':(rows.length>1?('leading by <b>'+(me.total-rows[1].total)+'</b>'):'first in');
+  else vs='<b>'+gap+'</b> behind 🥇 '+escapeHtml(leader.name)+(tied?' · tied at #'+rank:'');
   box.innerHTML='<span class="hpill">🎯 You: <b>#'+rank+'</b> of '+rows.length+'</span>'+
     '<span class="hpill">⭐ <b>'+me.total+'</b> pts</span>'+
     '<span class="hpill">'+vs+'</span>';
@@ -1240,8 +1240,8 @@ function renderPoolSummary(){
   const feeNum=Number(String(CONFIG.entryFee||'').replace(/[^0-9.]/g,''))||0;
   const pot=(feeNum&&N)?String(CONFIG.entryFee).replace(/[0-9.,]+/,(feeNum*N).toLocaleString('en-US')):null;
   const tiles=[['👥 Players',String(N)],['⚽ Group matches',scored+' / '+MATCHES.length]];
-  if(scored&&leader)tiles.push(['🥇 Leader',escapeHtml(leader.name)+' · '+leader.total+'p']);
-  if(state.myId&&state.entries[state.myId]){const i=rows.findIndex(r=>r.id===state.myId);if(i>=0)tiles.push(['🎯 You','#'+(i+1)+' of '+N+' · '+rows[i].total+'p','me']);}
+  if(scored&&leader){const co=rows.filter(r=>r.total===leader.total).length;tiles.push(['🥇 Leader',(co>1?(co+'-way tie · '):(escapeHtml(leader.name)+' · '))+leader.total+'p']);}
+  if(state.myId&&state.entries[state.myId]){const m=rows.find(r=>r.id===state.myId);if(m)tiles.push(['🎯 You','#'+m._rank+' of '+N+' · '+m.total+'p','me']);}
   if(pot)tiles.push(['💰 Pot',pot]);
   box.innerHTML=tiles.map(([k,v,me])=>'<div class="pt'+(me?' me':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>').join('');
 }
