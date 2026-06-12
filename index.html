@@ -467,7 +467,6 @@
           <div><h2 style="margin:0">🏆 Leaderboard</h2><p class="muted" id="boardMeta" style="margin:3px 0 0">Standings update automatically.</p></div>
           <span class="livepill">● Live</span>
         </div>
-        <input id="lbSearch" class="lb-search" placeholder="🔍  Search entries…" autocomplete="off" style="margin-top:10px">
         <div class="btnrow" style="margin:2px 0 10px"><button class="btn ghost sm hide" id="editEntry">✏️ Edit my picks</button></div>
         <div id="board"></div>
       </div>
@@ -985,10 +984,8 @@ function renderBoard(){
       '<div class="lbr-main"><div class="lbr-name">'+flag+'<span class="nm">'+escapeHtml(r.name)+'</span>'+badge+(r.id===state.myId?' <span class="muted">(you)</span>':'')+'</div><div class="lbr-sub">'+sub+'</div></div>'+
       '<div class="lbr-pts"><b>'+ptOf(r)+'</b><span>pts</span></div></div>';
   };
-  const q=(($('#lbSearch')&&$('#lbSearch').value)||'').trim().toLowerCase();
-  const filtered=q?rows.filter(r=>r.name.toLowerCase().includes(q)):rows;
-  let h=filtered.slice(0,10).map(rowHtml).join('')||'<div class="empty">No entries match your search.</div>';
-  if(!q&&state.myId&&state.entries[state.myId]){const mine=rows.find(r=>r.id===state.myId);if(mine&&mine._rank>10)h+='<div class="lb-divider">Your position</div>'+rowHtml(mine);}
+  let h=rows.slice(0,10).map(rowHtml).join('');
+  if(state.myId&&state.entries[state.myId]){const mine=rows.find(r=>r.id===state.myId);if(mine&&mine._rank>10)h+='<div class="lb-divider">Your position</div>'+rowHtml(mine);}
   if(AUDIT)h+=renderAudit(ids);
   root.innerHTML=h;
   const eb=$('#editEntry');if(eb)eb.classList.toggle('hide',!(state.myId&&state.entries[state.myId])||isLocked());
@@ -1416,7 +1413,6 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.t
 $('#refreshNow').onclick=fetchLive;
 document.querySelectorAll('.subtab').forEach(b=>b.onclick=()=>switchSub(b.dataset.sub));
 if($('#schedFilter'))$('#schedFilter').onchange=renderSchedule;
-if($('#lbSearch'))$('#lbSearch').oninput=renderBoard;
 $('#editEntry').onclick=editMyPicks;
 $('#loadMine').onclick=loadMyEntryByName;
 $('#modalClose').onclick=closeModal;
