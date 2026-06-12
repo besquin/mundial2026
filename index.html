@@ -147,9 +147,6 @@
   @media(max-width:860px){.lb-wrap{grid-template-columns:1fr}}
   .lb-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
   .livepill{flex:0 0 auto;font-size:11px;font-weight:700;color:#86efac;background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:4px 10px}
-  .lb-filters{display:flex;gap:4px;background:var(--bg2);padding:4px;border-radius:11px;margin:12px 0 10px}
-  .lbf{flex:1;background:transparent;border:0;color:var(--mut);padding:8px 6px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px}
-  .lbf.active{background:var(--acc);color:#04210f}
   .lb-search{width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--txt);border-radius:11px;padding:11px 14px;font-size:14px;margin-bottom:10px}
   .lbrow{display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:9px;cursor:pointer;transition:border-color .15s,transform .08s}
   .lbrow:hover{border-color:#33457a}.lbrow:active{transform:scale(.995)}
@@ -450,12 +447,7 @@
           <div><h2 style="margin:0">🏆 Leaderboard</h2><p class="muted" id="boardMeta" style="margin:3px 0 0">Standings update automatically.</p></div>
           <span class="livepill">● Live</span>
         </div>
-        <div class="lb-filters">
-          <button class="lbf active" data-lbf="total">Total</button>
-          <button class="lbf" data-lbf="group">Group Stage</button>
-          <button class="lbf" data-lbf="ko">Knockout</button>
-        </div>
-        <input id="lbSearch" class="lb-search" placeholder="🔍  Search entries…" autocomplete="off">
+        <input id="lbSearch" class="lb-search" placeholder="🔍  Search entries…" autocomplete="off" style="margin-top:10px">
         <div class="btnrow" style="margin:2px 0 10px"><button class="btn ghost sm hide" id="editEntry">✏️ Edit my picks</button></div>
         <div id="board"></div>
       </div>
@@ -942,15 +934,13 @@ function poolRows(){
   rows.sort((a,b)=>b.total-a.total||(b.groupCorrect+b.wcCorrect+b.koCorrect)-(a.groupCorrect+a.wcCorrect+a.koCorrect)||a.at-b.at);
   return rows;
 }
-let lbFilter='total';
 function entryNat(e){const b=(e&&e.bracket)||{};return b[FINID]||b.K31||null;}   // champion pick = country badge
 function renderBoard(){
   const ids=Object.keys(state.entries);const ec=$('#entryCount');if(ec)ec.textContent=ids.length;
   const root=$('#board');if(!root)return;
   if(!ids.length){root.innerHTML='<div class="empty">No entries yet. Be the first! 🥇</div>';renderRecent();renderYourRound();return;}
-  const ptOf=r=>lbFilter==='group'?r.groupPts:(lbFilter==='ko'?r.koPts:r.total);
-  let rows=poolRows();
-  if(lbFilter!=='total')rows=rows.slice().sort((a,b)=>ptOf(b)-ptOf(a)||a.at-b.at);
+  const ptOf=r=>r.total;
+  const rows=poolRows();
   rows.forEach((r,i)=>r._rank=i+1);
   const rowHtml=r=>{
     const e=state.entries[r.id];const nat=entryNat(e);
@@ -1370,7 +1360,6 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.t
 $('#refreshNow').onclick=fetchLive;
 document.querySelectorAll('.subtab').forEach(b=>b.onclick=()=>switchSub(b.dataset.sub));
 if($('#schedFilter'))$('#schedFilter').onchange=renderSchedule;
-document.querySelectorAll('.lbf').forEach(b=>b.onclick=()=>{lbFilter=b.dataset.lbf;document.querySelectorAll('.lbf').forEach(x=>x.classList.toggle('active',x===b));renderBoard();});
 if($('#lbSearch'))$('#lbSearch').oninput=renderBoard;
 $('#editEntry').onclick=editMyPicks;
 $('#loadMine').onclick=loadMyEntryByName;
