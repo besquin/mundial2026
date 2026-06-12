@@ -134,6 +134,11 @@
   .mc-pct .ph{color:#86efac}.mc-pct .pd{color:var(--mut)}.mc-pct .pa{color:#fca5a5}
   .mc-pn{text-align:center;font-size:10px;color:var(--mut);margin-top:6px}
   .mc-foot{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--mut)}
+  .psum{display:grid;grid-template-columns:repeat(auto-fit,minmax(116px,1fr));gap:10px;margin-bottom:14px}
+  .psum .pt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .psum .pt .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .psum .pt .v{font-size:18px;font-weight:800;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .psum .pt.me{border-color:rgba(34,197,94,.45);background:linear-gradient(180deg,rgba(34,197,94,.08),var(--card))}
   .pred{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
   .pred .lbl{font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .mini{width:100%;font-size:13px;border-collapse:collapse;margin-top:6px}
@@ -386,7 +391,7 @@
       <div class="progress" style="margin-top:6px"><i id="resProg"></i></div>
       <p class="muted" id="resProgTxt" style="margin-top:8px">0 / 72 group matches played</p>
     </div>
-    <div id="subview-schedule"><div id="schedCards"></div></div>
+    <div id="subview-schedule"><div id="poolSummary" class="psum"></div><div id="schedCards"></div></div>
     <div id="subview-draw" class="hide"><div class="card"><h2>Knockout progress</h2><p class="muted">Live bracket — teams advance automatically as results come in.</p><div id="koLive"></div></div></div>
     <div id="subview-standings" class="hide"><div class="card"><h2>Group standings</h2><p class="muted">Top 2 (green) qualify · best 8 third-placed (gold) are the wild cards.</p><div id="standings" class="grid2"></div></div></div>
   </section>
@@ -837,11 +842,15 @@ function renderAudit(ids){
 }
 
 /* =========================== LEADERBOARD =========================== */
+function poolRows(){
+  const rows=Object.keys(state.entries).map(id=>{const e=state.entries[id];return{id,name:e.name||'Anon',...scoreEntry(e),at:e.createdAt||0};});
+  rows.sort((a,b)=>b.total-a.total||(b.groupCorrect+b.wcCorrect+b.koCorrect)-(a.groupCorrect+a.wcCorrect+a.koCorrect)||a.at-b.at);
+  return rows;
+}
 function renderBoard(){
   const root=$('#board');const ids=Object.keys(state.entries);$('#entryCount').textContent=ids.length;
   if(!ids.length){root.innerHTML='<div class="empty">No entries yet. Be the first! 🥇</div>';return;}
-  const rows=ids.map(id=>{const e=state.entries[id];return{id,name:e.name||'Anon',...scoreEntry(e),at:e.createdAt||0};});
-  rows.sort((a,b)=>b.total-a.total||(b.groupCorrect+b.wcCorrect+b.koCorrect)-(a.groupCorrect+a.wcCorrect+a.koCorrect)||a.at-b.at);
+  const rows=poolRows();
   let h=`<table class="lb"><thead><tr><th>#</th><th>Player</th><th class="num">Grp</th><th class="num">WC</th><th class="num">KO</th><th class="num">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{const me=r.id===state.myId?' class="me"':'';const md=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
     const iss=entryIssues(state.entries[r.id]);const flag=iss.length?('<span title="'+escapeHtml('Issues: '+iss.join(' · '))+'" style="cursor:help">🚩 </span>'):'';
@@ -1020,7 +1029,21 @@ function groupCard(id,no){
     '<div class="mc-top"><span class="mc-no">'+(no?('Match '+no):('Group '+m.group))+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
     '<div class="mc-teams">'+teamRow(m.home,'home')+center+teamRow(m.away,'away')+'</div>'+pred+foot+'</div>';
 }
+function renderPoolSummary(){
+  const box=$('#poolSummary');if(!box)return;
+  const N=Object.keys(state.entries).length;
+  const scored=Object.keys(state.results.matches).length;
+  const rows=poolRows();const leader=rows[0];
+  const feeNum=Number(String(CONFIG.entryFee||'').replace(/[^0-9.]/g,''))||0;
+  const pot=(feeNum&&N)?String(CONFIG.entryFee).replace(/[0-9.,]+/,(feeNum*N).toLocaleString('en-US')):null;
+  const tiles=[['👥 Players',String(N)],['⚽ Group matches',scored+' / '+MATCHES.length]];
+  if(scored&&leader)tiles.push(['🥇 Leader',escapeHtml(leader.name)+' · '+leader.total+'p']);
+  if(state.myId&&state.entries[state.myId]){const i=rows.findIndex(r=>r.id===state.myId);if(i>=0)tiles.push(['🎯 You','#'+(i+1)+' of '+N+' · '+rows[i].total+'p','me']);}
+  if(pot)tiles.push(['💰 Pot',pot]);
+  box.innerHTML=tiles.map(([k,v,me])=>'<div class="pt'+(me?' me':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>').join('');
+}
 function renderSchedule(){
+  renderPoolSummary();
   const root=$('#schedCards');if(!root)return;
   const filt=($('#schedFilter')&&$('#schedFilter').value)||'all';
   // chronological match numbers from the feed's kickoff times (official-style numbering)
