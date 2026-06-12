@@ -866,13 +866,17 @@ function renderResults(){
 /* =========================== LIVE FEED =========================== */
 function koStage(s){s=String(s||'').toLowerCase();if(s.includes('third')||s.includes('3rd'))return'3P';if(s.includes('quarter'))return'QF';if(s.includes('semi'))return'SF';if(s.includes('16'))return'R16';if(s.includes('32'))return'R32';if(s.includes('final'))return'F';if(s.includes('group'))return'GROUP';return null;}
 let _sdbSeason=null;
+// Only count a match once it's actually over — ignore live/scheduled games
+// (HT/1H/2H/NS) so an in-progress 0-0 doesn't show as a finished draw.
+function _sdbFinished(s){s=String(s||'').toUpperCase().trim();return s==='FT'||s==='AET'||s==='PEN'||s==='AP'||s==='FT_PEN'||s==='AWARDED'||s==='WO'||s.includes('FINISH');}
 function _sdbMap(j){
   return (j&&j.events||[]).map(e=>{
     let st=koStage(e.strStage||e.strRound||e.strDescriptionEN||'');
     if(!st&&e.strGroup&&String(e.strGroup).trim()!=='')st='GROUP';
     const hc=codeOf(e.strHomeTeam),ac=codeOf(e.strAwayTeam);
     if(!st&&hc&&ac&&PAIR2MATCH[[hc,ac].sort().join('|')])st='GROUP';   // group game even if feed didn't tag it
-    const hs=e.intHomeScore,as=e.intAwayScore;
+    const fin=_sdbFinished(e.strStatus);
+    const hs=fin?e.intHomeScore:null,as=fin?e.intAwayScore:null;       // null until the match is final
     return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st};
   }).filter(e=>e.home&&e.away&&e.stage);
 }
