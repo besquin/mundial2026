@@ -334,7 +334,7 @@ const CONFIG = {
   lockISO:   "2026-06-11T10:00:00-07:00",   // 2 hours before kickoff (10:00 AM PDT, Jun 11)
   revealOffsetMin: 30,                        // others' picks reveal 30 min before kickoff (11:30 AM PDT Jun 11)
   resultsEndpoint: null,
-  sportsdb: { key: "3", leagueId: "4429", season: "2026" },
+  sportsdb: { key: "123", leagueId: "4429", seasons: ["2026","2026-2027","2025-2026"] },
   pollMs: 60000, entriesPollMs: 15000,
   // Points per correct prediction (edit freely)
   scoring: { match:1, exactScore:2, first:2, second:1, wildcard:2, r16:2, qf:4, sf:8, finalist:12, champion:20, third:8, matchupBonus:3 },
@@ -865,12 +865,32 @@ function renderResults(){
 
 /* =========================== LIVE FEED =========================== */
 function koStage(s){s=String(s||'').toLowerCase();if(s.includes('third')||s.includes('3rd'))return'3P';if(s.includes('quarter'))return'QF';if(s.includes('semi'))return'SF';if(s.includes('16'))return'R16';if(s.includes('32'))return'R32';if(s.includes('final'))return'F';if(s.includes('group'))return'GROUP';return null;}
+let _sdbSeason=null;
+function _sdbMap(j){
+  return (j&&j.events||[]).map(e=>{
+    let st=koStage(e.strStage||e.strRound||e.strDescriptionEN||'');
+    if(!st&&e.strGroup&&String(e.strGroup).trim()!=='')st='GROUP';
+    const hc=codeOf(e.strHomeTeam),ac=codeOf(e.strAwayTeam);
+    if(!st&&hc&&ac&&PAIR2MATCH[[hc,ac].sort().join('|')])st='GROUP';   // group game even if feed didn't tag it
+    const hs=e.intHomeScore,as=e.intAwayScore;
+    return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st};
+  }).filter(e=>e.home&&e.away&&e.stage);
+}
 async function fetchSportsDB(){
-  const c=CONFIG.sportsdb;const url='https://www.thesportsdb.com/api/v1/json/'+c.key+'/eventsseason.php?id='+c.leagueId+'&s='+c.season;
-  const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('TheSportsDB HTTP '+r.status);
-  const j=await r.json();
-  const events=(j.events||[]).map(e=>{let st=koStage(e.strStage||e.strRound||e.strDescriptionEN||'');if(!st&&e.strGroup&&String(e.strGroup).trim()!=='')st='GROUP';const hs=e.intHomeScore,as=e.intAwayScore;return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st};}).filter(e=>e.home&&e.away&&e.stage);
-  return{source:'thesportsdb',events,lastUpdated:new Date().toISOString()};
+  const c=CONFIG.sportsdb;const seasons=_sdbSeason?[_sdbSeason]:(c.seasons||[c.season]);
+  let lastErr='no data';
+  for(const season of seasons){
+    try{
+      const url='https://www.thesportsdb.com/api/v1/json/'+c.key+'/eventsseason.php?id='+c.leagueId+'&s='+encodeURIComponent(season);
+      const r=await fetch(url,{cache:'no-store'});
+      if(!r.ok){lastErr='HTTP '+r.status+' (season '+season+')';continue;}
+      const events=_sdbMap(await r.json());
+      if(events.length){_sdbSeason=season;return{source:'thesportsdb',season,events,lastUpdated:new Date().toISOString()};}
+      lastErr='no group/KO events (season '+season+')';
+    }catch(e){lastErr=String(e.message||e);}
+  }
+  _sdbSeason=null;
+  throw new Error('TheSportsDB — '+lastErr);
 }
 function ingest(events){
   const matches={};const scores={};const tbl={};GLETTERS.forEach(g=>{tbl[g]={};GROUPS[g].forEach(t=>tbl[g][t[0]]={code:t[0],p:0,w:0,d:0,gf:0,ga:0});});
