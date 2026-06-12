@@ -876,15 +876,32 @@ function _sdbMap(j){
     return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st};
   }).filter(e=>e.home&&e.away&&e.stage);
 }
+// Fetch a URL directly; if the browser blocks it (CORS / network), retry through
+// a free public CORS proxy so the client can still read the public feed.
+async function _sdbGet(url){
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    if(r.ok)return await r.json();
+    if(r.status!==0)throw new Error('HTTP '+r.status);
+  }catch(e){/* fall through to proxy (covers CORS "Failed to fetch") */}
+  const proxies=[
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+    u=>'https://corsproxy.io/?url='+encodeURIComponent(u)
+  ];
+  let perr='blocked';
+  for(const p of proxies){
+    try{const r=await fetch(p(url),{cache:'no-store'});if(r.ok)return await r.json();perr='HTTP '+r.status;}
+    catch(e){perr=String(e.message||e);}
+  }
+  throw new Error(perr);
+}
 async function fetchSportsDB(){
   const c=CONFIG.sportsdb;const seasons=_sdbSeason?[_sdbSeason]:(c.seasons||[c.season]);
   let lastErr='no data';
   for(const season of seasons){
     try{
       const url='https://www.thesportsdb.com/api/v1/json/'+c.key+'/eventsseason.php?id='+c.leagueId+'&s='+encodeURIComponent(season);
-      const r=await fetch(url,{cache:'no-store'});
-      if(!r.ok){lastErr='HTTP '+r.status+' (season '+season+')';continue;}
-      const events=_sdbMap(await r.json());
+      const events=_sdbMap(await _sdbGet(url));
       if(events.length){_sdbSeason=season;return{source:'thesportsdb',season,events,lastUpdated:new Date().toISOString()};}
       lastErr='no group/KO events (season '+season+')';
     }catch(e){lastErr=String(e.message||e);}
