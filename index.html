@@ -114,7 +114,9 @@
   .b-fin{background:rgba(34,197,94,.16);color:#86efac}
   .b-live{background:rgba(251,191,36,.18);color:var(--gold)}
   .b-today{background:rgba(59,130,246,.18);color:#93c5fd}
+  .b-ended{background:rgba(148,163,184,.18);color:#cbd5e1}
   .b-upc{background:var(--bg2);color:var(--mut)}
+  .mcard.s-ended{border-color:rgba(148,163,184,.3)}
   .mc-teams{display:flex;align-items:center;gap:8px}
   .mc-team{flex:1;display:flex;align-items:center;gap:9px;min-width:0}
   .mc-team.away{flex-direction:row-reverse;text-align:right}
@@ -1167,7 +1169,8 @@ function fmtTime(t){if(!t)return'';const m=String(t).match(/(\d{1,2}):(\d{2})/);
 function schedStatus(sd){
   if(!sd)return{key:'upc',label:'Upcoming'};
   const s=String(sd.status||'').toUpperCase().trim();
-  if(_sdbFinished(s))return{key:'fin',label:'Final'};
+  if(sd.fin||_sdbFinished(s))return{key:'fin',label:'Final'};
+  if(sd.ended)return{key:'ended',label:'Awaiting result'};   // long past kickoff but feed has no final score yet
   if(s&&s!=='NS'&&s!=='NOT STARTED'&&s!=='POSTP'&&s!=='TBD')return{key:'live',label:'Live'};
   if(sd.date){const d=new Date(sd.date+'T12:00:00');if(!isNaN(d)&&d.toDateString()===new Date().toDateString())return{key:'today',label:'Today'};}
   return{key:'upc',label:'Upcoming'};
@@ -1259,15 +1262,24 @@ let _sdbSeason=null;
 // Only count a match once it's actually over — ignore live/scheduled games
 // (HT/1H/2H/NS) so an in-progress 0-0 doesn't show as a finished draw.
 function _sdbFinished(s){s=String(s||'').toUpperCase().trim();return s==='FT'||s==='AET'||s==='PEN'||s==='AP'||s==='FT_PEN'||s==='AWARDED'||s==='WO'||s.includes('FINISH');}
+function _kickoffMs(e){
+  let ts=e.strTimestamp||'';
+  if(ts){ts=ts.replace(' ','T');if(!/[zZ]|[+]\d\d:?\d\d$/.test(ts))ts+='Z';const t=Date.parse(ts);if(!isNaN(t))return t;}
+  if(e.dateEvent){const t=Date.parse(e.dateEvent+'T'+(e.strTime||'00:00:00')+'Z');if(!isNaN(t))return t;}
+  return null;
+}
 function _sdbMap(j){
   return (j&&j.events||[]).map(e=>{
     let st=koStage(e.strStage||e.strRound||e.strDescriptionEN||'');
     if(!st&&e.strGroup&&String(e.strGroup).trim()!=='')st='GROUP';
     const hc=codeOf(e.strHomeTeam),ac=codeOf(e.strAwayTeam);
     if(!st&&hc&&ac&&PAIR2MATCH[[hc,ac].sort().join('|')])st='GROUP';   // group game even if feed didn't tag it
-    const fin=_sdbFinished(e.strStatus);
-    const hs=fin?e.intHomeScore:null,as=fin?e.intAwayScore:null;       // null until the match is final
-    return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st,
+    const rawH=e.intHomeScore,rawA=e.intAwayScore;
+    const hasScore=!(rawH===''||rawH==null)&&!(rawA===''||rawA==null);
+    const ko=_kickoffMs(e);const ended=ko!=null&&Date.now()>ko+150*60000;   // ~2.5h after kickoff = over
+    const fin=_sdbFinished(e.strStatus)||(ended&&hasScore);                  // trust status, or a long-past match that has a score
+    const hs=fin?rawH:null,as=fin?rawA:null;                                 // null until the match is final
+    return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st,fin,ended,
       date:e.dateEventLocal||e.dateEvent||null,time:e.strTimeLocal||e.strTime||null,venue:e.strVenue||null,status:e.strStatus||null};
   }).filter(e=>e.home&&e.away&&e.stage);
 }
@@ -1308,7 +1320,7 @@ function ingest(events){
   (events||[]).forEach(ev=>{
     const hc=codeOf(ev.home),ac=codeOf(ev.away);if(!hc||!ac)return;
     const mm0=PAIR2MATCH[[hc,ac].sort().join('|')];
-    if(ev.stage==='GROUP'&&mm0)sched[mm0.id]={date:ev.date,time:ev.time,venue:ev.venue,status:ev.status,hs:ev.hs,as:ev.as}; // schedule shown even before kickoff
+    if(ev.stage==='GROUP'&&mm0)sched[mm0.id]={date:ev.date,time:ev.time,venue:ev.venue,status:ev.status,fin:ev.fin,ended:ev.ended,hs:ev.hs,as:ev.as}; // schedule shown even before kickoff
     if(ev.stage==='GROUP'){
       const hs=ev.hs,as=ev.as;if(!Number.isFinite(hs)||!Number.isFinite(as))return;
       const mm=mm0;if(mm){const win=hs>as?hc:as>hs?ac:null;matches[mm.id]=win===null?'draw':(win===mm.home?'home':'away');scores[mm.id]=(hc===mm.home)?{h:hs,a:as}:{h:as,a:hs};}
