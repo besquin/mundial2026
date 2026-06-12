@@ -1000,10 +1000,10 @@ function renderHeaderStats(rows){
   if(!me){box.classList.add('hide');return;}
   box.classList.remove('hide');
   const rank=me._rank;const tied=rows.filter(r=>r.total===me.total).length>1;
-  const leader=rows[0];const gap=leader.total-me.total;
+  const leader=rows[0];const gap=leader.total-me.total;const leadCount=rows.filter(r=>r.total===leader.total).length;
   let vs;
   if(rank===1)vs=tied?'🤝 tied for <b>1st</b>':(rows.length>1?('leading by <b>'+(me.total-rows[1].total)+'</b>'):'first in');
-  else vs='<b>'+gap+'</b> behind 🥇 '+escapeHtml(leader.name)+(tied?' · tied at #'+rank:'');
+  else{const lead=leadCount>1?('the lead ('+leadCount+'-way tie)'):('🥇 '+escapeHtml(leader.name));vs='<b>'+gap+'</b> behind '+lead+(tied?' · tied at #'+rank:'');}
   box.innerHTML='<span class="hpill">🎯 You: <b>#'+rank+'</b> of '+rows.length+'</span>'+
     '<span class="hpill">⭐ <b>'+me.total+'</b> pts</span>'+
     '<span class="hpill">'+vs+'</span>';
