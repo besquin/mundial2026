@@ -1328,7 +1328,7 @@ function renderSchedule(){
   MATCHES.forEach(m=>{const sd=state.schedule[m.id];if(sd&&sd.date)(byDay[sd.date]=byDay[sd.date]||[]).push(m.id);else noDay.push(m.id);});
   let html='';
   // collapsed by default; expanded only if the user opened it (persisted) — or when a filter is active
-  const isOpen=key=>filt!=='all'||_openSecs.has(key);
+  const isOpen=key=>key==='tbd'||filt!=='all'||_openSecs.has(key);   // 'awaiting feed' bucket always open
   const section=(key,title,ids,sub,bodyHtml)=>{
     let cards=bodyHtml;
     if(cards==null){const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');}
@@ -1342,7 +1342,7 @@ function renderSchedule(){
       '<div class="mgrid">'+(cards||'<p class="muted" style="grid-column:1/-1">No matches match this filter.</p>')+'</div></div>';
   };
   Object.keys(byDay).sort().forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
-  if(noDay.length)html+=section('tbd','Group Stage',noDay,noDay.length+' matches · schedule loading…');
+  if(noDay.length)html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish these');
   // knockout cards (resolved fixtures from the live feed)
   const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
   const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
