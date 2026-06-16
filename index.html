@@ -635,7 +635,28 @@ function assignThirds(wc){
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
 const NAMEMAP={}; ALL_TEAMS.forEach(t=>NAMEMAP[norm(t[1])]=t[0]);
 Object.assign(NAMEMAP,{southkorea:"KOR",korearepublic:"KOR",korea:"KOR",unitedstates:"USA",usa:"USA",us:"USA",iran:"IRN",iriran:"IRN",islamicrepublicofiran:"IRN",ivorycoast:"CIV",cotedivoire:"CIV",turkiye:"TUR",turkey:"TUR",czechia:"CZE",czechrepublic:"CZE",capeverde:"CPV",caboverde:"CPV",curacao:"CUW",drcongo:"COD",congodr:"COD",democraticrepublicofthecongo:"COD",congodemocraticrepublic:"COD",bosniaherz:"BIH",bosniaandherzegovina:"BIH",bosniaherzegovina:"BIH",saudiarabia:"SAU",southafrica:"RSA",newzealand:"NZL"});
-const codeOf=name=>NAMEMAP[norm(name)]||null;
+const codeOf=name=>{
+  const n=norm(name);if(!n)return null;
+  if(NAMEMAP[n])return NAMEMAP[n];
+  // tolerant fallback for feed name variants (e.g. "IR Iran", "Iran (Islamic Republic of)", "Korea Republic")
+  if(n.includes('iran')&&!n.includes('iraq'))return 'IRN';
+  if(n.includes('iraq'))return 'IRQ';
+  if(n.includes('korea'))return n.includes('north')||n.includes('dpr')?null:'KOR';
+  if(n.includes('turk'))return 'TUR';
+  if(n.includes('ivoir')||n.includes('ivory'))return 'CIV';
+  if(n.includes('curac'))return 'CUW';
+  if(n.includes('caboverde')||n.includes('capeverde'))return 'CPV';
+  if(n.includes('bosnia'))return 'BIH';
+  if(n.includes('czech'))return 'CZE';
+  if(n.includes('saudi'))return 'SAU';
+  if(n.includes('southafrica'))return 'RSA';
+  if(n.includes('newzealand'))return 'NZL';
+  if(n.includes('unitedstates')||n==='usa'||n==='us')return 'USA';
+  if(n.includes('congo'))return 'COD';
+  // last resort: feed name fully contains a canonical team name (5+ chars)
+  for(const t of ALL_TEAMS){const tn=norm(t[1]);if(tn.length>=5&&n.includes(tn))return t[0];}
+  return null;
+};
 
 /* =========================== STATE =========================== */
 /* Separate pools for different friend groups: ?g=ribos (friends, default), ?g=family, ?g=friends2, … */
