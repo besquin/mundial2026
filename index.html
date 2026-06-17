@@ -1341,10 +1341,10 @@ function renderSchedule(){
       (ids?'<div class="sec-prog"><i style="width:'+pct+'%"></i></div>':'')+'</div><span class="sec-chev">▾</span></div>'+
       '<div class="mgrid">'+(cards||'<p class="muted" style="grid-column:1/-1">No matches match this filter.</p>')+'</div></div>';
   };
-  // Default view: today + the next 2 match-days only (past days hidden). Filters override.
+  // Default view: today + the two previous match-days (most recent 3 up to today). Filters override.
   const todayKey=new Date().toLocaleDateString('en-CA');
   let dayKeys=Object.keys(byDay).sort();
-  if(filt==='all')dayKeys=dayKeys.filter(d=>d>=todayKey).slice(0,3);
+  if(filt==='all'){const upTo=dayKeys.filter(d=>d<=todayKey);dayKeys=(upTo.length?upTo:dayKeys).slice(-3).reverse();}  // today first, then the 2 prior
   dayKeys.forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
   if(noDay.length&&filt!=='all')html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish these');
   // knockout cards (resolved fixtures from the live feed)
@@ -1387,8 +1387,12 @@ function _sdbMap(j){
     const ko=_kickoffMs(e);const ended=ko!=null&&Date.now()>ko+150*60000;   // ~2.5h after kickoff = over
     const fin=_sdbFinished(e.strStatus)||(ended&&hasScore);                  // trust status, or a long-past match that has a score
     const hs=fin?rawH:null,as=fin?rawA:null;                                 // null until the match is final
+    // group + display in the viewer's local timezone (consistent across venue time zones)
+    const dt=ko!=null?new Date(ko):null;
+    const date=dt?dt.toLocaleDateString('en-CA'):(e.dateEventLocal||e.dateEvent||null);
+    const time=dt?dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):(e.strTimeLocal||e.strTime||null);
     return{home:e.strHomeTeam,away:e.strAwayTeam,hs:(hs===''||hs==null)?null:Number(hs),as:(as===''||as==null)?null:Number(as),stage:st,fin,ended,
-      date:e.dateEventLocal||e.dateEvent||null,time:e.strTimeLocal||e.strTime||null,venue:e.strVenue||null,status:e.strStatus||null};
+      date,time,venue:e.strVenue||null,status:e.strStatus||null};
   }).filter(e=>e.home&&e.away&&e.stage);
 }
 // Fetch a URL directly; if the browser blocks it (CORS / 404 / network), retry
