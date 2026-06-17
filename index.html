@@ -1341,8 +1341,12 @@ function renderSchedule(){
       (ids?'<div class="sec-prog"><i style="width:'+pct+'%"></i></div>':'')+'</div><span class="sec-chev">▾</span></div>'+
       '<div class="mgrid">'+(cards||'<p class="muted" style="grid-column:1/-1">No matches match this filter.</p>')+'</div></div>';
   };
-  Object.keys(byDay).sort().forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
-  if(noDay.length)html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish these');
+  // Default view: today + the next 2 match-days only (past days hidden). Filters override.
+  const todayKey=new Date().toLocaleDateString('en-CA');
+  let dayKeys=Object.keys(byDay).sort();
+  if(filt==='all')dayKeys=dayKeys.filter(d=>d>=todayKey).slice(0,3);
+  dayKeys.forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
+  if(noDay.length&&filt!=='all')html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish these');
   // knockout cards (resolved fixtures from the live feed)
   const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
   const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
