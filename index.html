@@ -1461,8 +1461,11 @@ async function fetchSportsDB(){
   const dayMs=86400000;const lid=String(c.leagueId);
   for(let off=-1;off<=1;off++){
     const d=new Date(Date.now()+off*dayMs).toISOString().slice(0,10);
-    try{const j=await _sdbGet(base+'eventsday.php?d='+d+'&l='+encodeURIComponent('FIFA World Cup'));
-      if(j&&j.events)add({events:j.events.filter(e=>String(e.idLeague)===lid)});}catch(e){}
+    for(const q of ['l='+encodeURIComponent('FIFA World Cup'),'s=Soccer']){
+      try{const j=await _sdbGet(base+'eventsday.php?d='+d+'&'+q);
+        const wc=(j&&j.events||[]).filter(e=>String(e.idLeague)===lid);
+        if(wc.length){add({events:wc});break;}}catch(e){}
+    }
   }
   // full season (comprehensive history), trying candidate season strings
   for(const season of seasons){
