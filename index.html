@@ -1457,6 +1457,13 @@ async function fetchSportsDB(){
   for(const ep of ['eventspastleague.php?id='+c.leagueId,'eventsnextleague.php?id='+c.leagueId]){
     try{add(await _sdbGet(base+ep));}catch(e){lastErr=String(e.message||e);}
   }
+  // by-date queries for yesterday/today/tomorrow (UTC) — most reliable for the current day's fixtures
+  const dayMs=86400000;const lid=String(c.leagueId);
+  for(let off=-1;off<=1;off++){
+    const d=new Date(Date.now()+off*dayMs).toISOString().slice(0,10);
+    try{const j=await _sdbGet(base+'eventsday.php?d='+d+'&l='+encodeURIComponent('FIFA World Cup'));
+      if(j&&j.events)add({events:j.events.filter(e=>String(e.idLeague)===lid)});}catch(e){}
+  }
   // full season (comprehensive history), trying candidate season strings
   for(const season of seasons){
     try{const j=await _sdbGet(base+'eventsseason.php?id='+c.leagueId+'&s='+encodeURIComponent(season));
