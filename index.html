@@ -373,6 +373,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="board">🏆 Leaderboard</button>
     <button class="tab" data-tab="results">📅 Schedule</button>
+    <button class="tab" data-tab="stats">📊 Stats</button>
     <button class="tab" data-tab="picks">📝 My Picks</button>
   </div>
 
@@ -510,6 +511,9 @@
     <div id="subview-schedule"><div id="poolSummary" class="psum"></div><div id="schedCards"></div></div>
     <div id="subview-standings" class="hide"><div class="card"><h2>Group standings</h2><p class="muted">Top 2 (green) qualify · best 8 third-placed (gold) are the wild cards.</p><div id="standings" class="grid2"></div></div></div>
   </section>
+
+  <!-- ===== STATS ===== -->
+  <section id="tab-stats" class="hide"><div id="statsBody"></div></section>
 
   <div id="entryModal" class="modal hide"><div class="modalbox" id="modalBox"><button class="modalx" id="modalClose">✕</button><div id="modalBody"></div></div></div>
 
@@ -1219,7 +1223,38 @@ function renderResults(){
   // reflect group match results onto picks chips
   for(const m of MATCHES){const chip=$('#rc-'+m.id);if(!chip)continue;const r=state.results.matches[m.id];if(!r){chip.classList.add('hide');continue;}chip.classList.remove('hide');const as=state.results.scores[m.id];const sTxt=as?(as.h+'–'+as.a):'';const mine=state.picks[m.id];const ms=state.scores[m.id];const exact=ms&&as&&ms.h===as.h&&ms.a===as.a;chip.textContent='Result '+sTxt;chip.className='res-chip '+(exact?'hit':(mine?(mine===r?'hit':'miss'):''));chip.title=exact?'Exact score! 🎯':'';}
   ALL_TEAMS.forEach(t=>{const c=$('#wc-'+t[0]);if(c)c.classList.toggle('win',state.proj.includes(t[0]));});
-  renderSchedule();
+  renderSchedule();renderStats();
+}
+/* ---- Stats tab ---- */
+function teamGoalsTable(){
+  const g={};const bump=(c,gf,ga)=>{if(!c)return;g[c]=g[c]||{gf:0,ga:0,p:0};g[c].gf+=gf;g[c].ga+=ga;g[c].p++;};
+  for(const m of MATCHES){const sc=state.results.scores[m.id];if(!sc)continue;bump(m.home,sc.h,sc.a);bump(m.away,sc.a,sc.h);}
+  (state.actual.koMatches||[]).forEach(km=>{const[x,y]=km.pair.split('|');const gg=km.g||{};if(Number.isFinite(gg[x])&&Number.isFinite(gg[y])){bump(x,gg[x],gg[y]);bump(y,gg[y],gg[x]);}});
+  return Object.keys(g).map(c=>({c,...g[c]})).sort((a,b)=>b.gf-a.gf||b.p-a.p||fa(a.c).localeCompare(fa(b.c)));
+}
+function predGoals(e){let t=0;const s=e.scores||{};for(const m of MATCHES){const x=s[m.id];if(x&&Number.isFinite(x.h)&&Number.isFinite(x.a))t+=x.h+x.a;}return t;}
+function bestSingleMatch(e){const S=CONFIG.scoring;let best=0;for(const m of MATCHES){const r=state.results.matches[m.id];if(!r)continue;let p=0;if(e.picks&&e.picks[m.id]===r)p+=S.match;const ps=e.scores&&e.scores[m.id],as=state.results.scores[m.id];if(ps&&as&&ps.h===as.h&&ps.a===as.a)p+=S.exactScore;if(p>best)best=p;}return best;}
+function renderStats(){
+  const box=$('#statsBody');if(!box)return;
+  const ids=Object.keys(state.entries);
+  const tg=teamGoalsTable();
+  let teamHtml;
+  if(!tg.length)teamHtml='<p class="muted">No matches have been played yet.</p>';
+  else{const max=tg[0].gf||1;teamHtml=tg.slice(0,12).map((t,i)=>'<div class="champrow"><div class="champlbl">'+(i+1)+'. '+fa(t.c)+'</div><div class="champbar"><i style="width:'+Math.round(t.gf/max*100)+'%"></i></div><div class="champpct">'+t.gf+'g · '+t.p+'gp</div></div>').join('');}
+  const rows=ids.map(id=>{const e=state.entries[id];const s=scoreEntry(e);return{name:e.name||'Anon',goals:predGoals(e),exact:s.exactScores,correct:s.matchCorrect,best:bestSingleMatch(e)};});
+  const top=(key,fmt)=>{
+    if(!rows.length)return '—';
+    const r=rows.slice().sort((a,b)=>b[key]-a[key]||a.name.localeCompare(b.name))[0];
+    if(!r||(r[key]===0&&key!=='goals'))return '—';
+    const tie=rows.filter(x=>x[key]===r[key]).length;
+    return escapeHtml(r.name)+' <span class="muted">'+fmt(r[key])+(tie>1?' (+'+(tie-1)+' tied)':'')+'</span>';
+  };
+  const pHtml='<div class="yr-row"><span class="yr-k">🥅 Most goals predicted</span><span class="yr-v">'+top('goals',v=>v+' goals')+'</span></div>'+
+    '<div class="yr-row"><span class="yr-k">🎯 Most exact scores</span><span class="yr-v">'+top('exact',v=>v+'×')+'</span></div>'+
+    '<div class="yr-row"><span class="yr-k">✅ Most correct results</span><span class="yr-v">'+top('correct',v=>v+'×')+'</span></div>'+
+    '<div class="yr-row"><span class="yr-k">🔥 Best single match</span><span class="yr-v">'+top('best',v=>'+'+v+' pts')+'</span></div>';
+  box.innerHTML='<div class="card"><h2>🏟️ Top scoring teams</h2><p class="muted">Total goals scored across every played match.</p>'+teamHtml+'</div>'+
+    '<div class="card"><h2>👥 Participant fun stats</h2>'+pHtml+'</div>';
 }
 
 /* ---- Schedule (card) view ---- */
@@ -1328,7 +1363,7 @@ function renderSchedule(){
   MATCHES.forEach(m=>{const sd=state.schedule[m.id];if(sd&&sd.date)(byDay[sd.date]=byDay[sd.date]||[]).push(m.id);else noDay.push(m.id);});
   let html='';
   // collapsed by default; expanded only if the user opened it (persisted) — or when a filter is active
-  const isOpen=key=>key==='tbd'||filt!=='all'||_openSecs.has(key);   // 'awaiting feed' bucket always open
+  const isOpen=key=>filt!=='all'||_openSecs.has(key);
   const section=(key,title,ids,sub,bodyHtml)=>{
     let cards=bodyHtml;
     if(cards==null){const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');}
@@ -1346,7 +1381,7 @@ function renderSchedule(){
   let dayKeys=Object.keys(byDay).sort();
   if(filt==='all'){const upTo=dayKeys.filter(d=>d<=todayKey);dayKeys=(upTo.length?upTo:dayKeys).slice(-3).reverse();}  // today first, then the 2 prior
   dayKeys.forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
-  if(noDay.length&&filt!=='all')html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish these');
+  if(noDay.length)html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish a kick-off time');
   // knockout cards (resolved fixtures from the live feed)
   const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
   const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
@@ -1485,7 +1520,7 @@ async function fetchLive(){
 }
 
 /* =========================== WIRING =========================== */
-function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$('#tab-picks').classList.toggle('hide',name!=='picks');$('#tab-board').classList.toggle('hide',name!=='board');$('#tab-results').classList.toggle('hide',name!=='results');if(name!=='picks')fetchLive();}
+function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$('#tab-picks').classList.toggle('hide',name!=='picks');$('#tab-board').classList.toggle('hide',name!=='board');$('#tab-results').classList.toggle('hide',name!=='results');$('#tab-stats').classList.toggle('hide',name!=='stats');if(name==='stats')renderStats();if(name!=='picks')fetchLive();}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('#refreshNow').onclick=fetchLive;
 document.querySelectorAll('.subtab').forEach(b=>b.onclick=()=>switchSub(b.dataset.sub));
@@ -1562,7 +1597,7 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
   if(ME)localStorage.setItem('wc_my_id_'+STOREKEY,ME);
   loadDraft();$('#playerPin').value=localStorage.getItem('wc_pin_'+STOREKEY)||'';recomputeQualifiers();applyAll();
   let _meLoaded=false;
-  Store.onEntries(d=>{state.entries=d||{};renderBoard();renderSchedule();if(ME&&!_meLoaded&&state.entries[state.myId]){_meLoaded=true;loadEntryIntoForm(state.entries[state.myId]);switchTab('picks');}});
+  Store.onEntries(d=>{state.entries=d||{};renderBoard();renderSchedule();renderStats();if(ME&&!_meLoaded&&state.entries[state.myId]){_meLoaded=true;loadEntryIntoForm(state.entries[state.myId]);switchTab('picks');}});
   await Store.init();setModeBanner();
   tickClock();setInterval(tickClock,1000);
   fetchLive();
