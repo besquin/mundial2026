@@ -1522,7 +1522,7 @@ function ingest(events){
   });
   // fill any group fixture the live feed hasn't published yet from the official static schedule
   MATCHES.forEach(m=>{if(sched[m.id])return;const ms=STATIC_MS[m.id];if(ms==null)return;const dt=new Date(ms);
-    sched[m.id]={date:dt.toLocaleDateString('en-CA'),time:dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),venue:null,status:null,fin:false,ended:false,hs:null,as:null};});
+    sched[m.id]={date:dt.toLocaleDateString('en-CA'),time:dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),venue:null,status:null,fin:false,ended:Date.now()>ms+150*60000,hs:null,as:null};});
   const standings={};const groups={};
   GLETTERS.forEach(g=>{
     const arr=Object.values(tbl[g]).map(t=>({...t,gd:t.gf-t.ga,pts:t.w*3+t.d}));
@@ -1546,6 +1546,8 @@ async function fetchLive(){
     state.results.matches=out.matches;state.results.scores=out.scores;state.schedule=out.sched||{};state.standings=out.standings;state.proj=out.proj;state.groupComplete=out.groupComplete;
     state.actual.groups=out.groups;state.actual.wildcards=out.groupComplete?out.proj:[];state.actual.ko=out.ko;state.actual.koMatches=out.koMatches;state.actual.champion=out.champion;state.actual.third=out.third;
     state.feed={source:data.source||'none',lastUpdated:data.lastUpdated||new Date().toISOString(),played:Object.keys(out.matches).length};
+  } else if(!Object.keys(state.schedule).length){
+    state.schedule=ingest([]).sched||{};   // feed unreachable on first load — still show the static fixture schedule
   }
   renderBoard();renderResults();refreshSummary();
 }
