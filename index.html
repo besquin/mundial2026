@@ -1470,22 +1470,10 @@ async function fetchSportsDB(){
   const seasons=_sdbSeason?[_sdbSeason]:(c.seasons||[c.season]);
   const raw=[];const seen=new Set();let seasonUsed=null,lastErr='no data';
   const add=j=>{(j&&j.events||[]).forEach(e=>{const k=e.idEvent||(e.strHomeTeam+'|'+e.strAwayTeam+'|'+e.dateEvent);if(!seen.has(k)){seen.add(k);raw.push(e);}});};
-  // rolling "recent results" + "upcoming" windows — these always carry the current matches,
-  // even when the season feed lags / returns a partial set.
-  for(const ep of ['eventspastleague.php?id='+c.leagueId,'eventsnextleague.php?id='+c.leagueId]){
-    try{add(await _sdbGet(base+ep));}catch(e){lastErr=String(e.message||e);}
-  }
-  // by-date queries for yesterday/today/tomorrow (UTC) — most reliable for the current day's fixtures
-  const dayMs=86400000;const lid=String(c.leagueId);
-  for(let off=-1;off<=1;off++){
-    const d=new Date(Date.now()+off*dayMs).toISOString().slice(0,10);
-    for(const q of ['l='+encodeURIComponent('FIFA World Cup'),'s=Soccer']){
-      try{const j=await _sdbGet(base+'eventsday.php?d='+d+'&'+q);
-        const wc=(j&&j.events||[]).filter(e=>String(e.idLeague)===lid);
-        if(wc.length){add({events:wc});break;}}catch(e){}
-    }
-  }
-  // full season (comprehensive history), trying candidate season strings
+  // Fixtures come from the hardcoded schedule, so the feed only needs to supply SCORES.
+  // Keep this light (2 calls) to avoid rate-limiting the shared free key.
+  try{add(await _sdbGet(base+'eventspastleague.php?id='+c.leagueId));}catch(e){lastErr=String(e.message||e);}   // freshest results
+  // full season (bulk results), trying candidate season strings
   for(const season of seasons){
     try{const j=await _sdbGet(base+'eventsseason.php?id='+c.leagueId+'&s='+encodeURIComponent(season));
       const n=(j&&j.events&&j.events.length)||0;add(j);
