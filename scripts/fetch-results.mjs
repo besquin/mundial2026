@@ -6,7 +6,7 @@
 // Supplementary: TheSportsDB free key (only serves ~Matchday 1, used as backup).
 
 const DB = 'https://ribosmundial2026-default-rtdb.firebaseio.com';
-const FEED = DB + '/pools/_feedcache.json';
+const FEED = DB + '/pools/_results.json';
 const FD_TOKEN = process.env.FOOTBALL_DATA_TOKEN || '';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');

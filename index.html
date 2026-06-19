@@ -726,7 +726,7 @@ const Store=(()=>{
   let mode='local',poolId=null,poolError=false,db=null,fns=null;
   const listeners=[]; const emit=v=>listeners.forEach(fn=>fn(v));
   const feedListeners=[];
-  const FEEDPATH='pools/_feedcache';   // shared live-results cache (one fetch feeds everyone)
+  const FEEDPATH='pools/_results';   // shared live-results cache (Action-written; browsers read-only)
   const LK='wc_entries';
   const bc=('BroadcastChannel'in window)?new BroadcastChannel('wc26'):null;
   const localLoad=()=>JSON.parse(localStorage.getItem(LK)||'{}');
