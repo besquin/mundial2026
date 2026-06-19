@@ -720,7 +720,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=3;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=4;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1575,8 +1575,15 @@ async function fetchLive(){
   if(_fbFeed&&_fbFeed.events&&(Array.isArray(_fbFeed.events)?_fbFeed.events.length:Object.keys(_fbFeed.events).length)){
     applyEvents(_fbFeed.events,(_fbFeed.source||'live')+' · shared',_fbFeed.at);return;
   }
-  // No shared results yet (Action hasn't written, or non-cloud mode) — try a direct read
-  // for THIS browser's display only, and do NOT save it to the shared cache.
+  // In cloud mode, wait for the shared (server-written) feed — do NOT fall back to a
+  // direct feed fetch. The browser can only reach a capped ~15-match feed, which would
+  // flash stale, too-low scores for a moment before Firebase loads the full results.
+  if(Store.mode==='cloud'){
+    if(!Object.keys(state.schedule).length){state.schedule=ingest([]).sched||{};renderBoard();renderResults();refreshSummary();}
+    if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Loading live results… <span class="muted">(updates automatically)</span>`;
+    return;
+  }
+  // Non-cloud (local) mode only — direct read for THIS browser's display.
   let data=null;
   if(CONFIG.resultsEndpoint){try{const r=await fetch(CONFIG.resultsEndpoint,{cache:'no-store'});if(r.ok){const d=await r.json();data={events:(d.matches||[]).map(m=>({...m,stage:'GROUP'})),source:d.source};}}catch(e){}}
   if(!data){try{data=await fetchSportsDB();}catch(e){if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Waiting for live results… <span class="muted">(updates automatically)</span>`;}}
