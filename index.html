@@ -1489,6 +1489,7 @@ async function fetchSportsDB(){
   return{source:'thesportsdb',season:seasonUsed,events,lastUpdated:new Date().toISOString()};
 }
 function ingest(events){
+  events=Array.isArray(events)?events:(events&&typeof events==='object'?Object.values(events):[]);   // tolerate Firebase array-as-object
   const matches={};const scores={};const sched={};const tbl={};GLETTERS.forEach(g=>{tbl[g]={};GROUPS[g].forEach(t=>tbl[g][t[0]]={code:t[0],p:0,w:0,d:0,gf:0,ga:0});});
   const ko={R16:[],QF:[],SF:[],F:[]};const koMatches=[];let champion=null,third=null;
   (events||[]).forEach(ev=>{
@@ -1530,7 +1531,7 @@ function ingest(events){
 }
 let _fbFeed=null;   // shared results cached in Firebase (written by whoever can fetch)
 function applyEvents(events,source,atMs){
-  const out=ingest(events||[]);
+  let out;try{out=ingest(events||[]);}catch(e){console.warn('feed ingest failed',e);return;}
   state.results.matches=out.matches;state.results.scores=out.scores;state.schedule=out.sched||{};state.standings=out.standings;state.proj=out.proj;state.groupComplete=out.groupComplete;
   state.actual.groups=out.groups;state.actual.wildcards=out.groupComplete?out.proj:[];state.actual.ko=out.ko;state.actual.koMatches=out.koMatches;state.actual.champion=out.champion;state.actual.third=out.third;
   state.feed={source:source||'none',lastUpdated:atMs?new Date(atMs).toISOString():new Date().toISOString(),played:Object.keys(out.matches).length};
@@ -1628,6 +1629,7 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
   if($('#poolPill'))$('#poolPill').textContent='🏷️ '+(GROUPLABEL+' pool');
   document.title='WC 2026 Pick\'em'+(' — '+GROUPLABEL);
   buildGroups();
+  try{state.schedule=ingest([]).sched||{};}catch(e){}   // show the static fixture schedule immediately, before any feed
   if(ME)localStorage.setItem('wc_my_id_'+STOREKEY,ME);
   loadDraft();$('#playerPin').value=localStorage.getItem('wc_pin_'+STOREKEY)||'';recomputeQualifiers();applyAll();
   let _meLoaded=false;
