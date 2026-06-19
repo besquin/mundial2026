@@ -27,16 +27,23 @@ const key = e => [norm(e.home), norm(e.away)].sort().join('|');
 
 async function getJSON(url) { const r = await fetch(url, { headers: { 'User-Agent': 'wc26-pool' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const raw = []; const seen = new Set();
-  const add = j => (j && j.events || []).forEach(e => { if (String(e.idLeague) !== LEAGUE) return; const k = e.idEvent || (e.strHomeTeam + e.strAwayTeam + e.dateEvent); if (!seen.has(k)) { seen.add(k); raw.push(e); } });
-  for (const ep of ['eventspastleague.php?id=' + LEAGUE, 'eventsnextleague.php?id=' + LEAGUE, 'eventsseason.php?id=' + LEAGUE + '&s=2026']) {
-    try { add(await getJSON(base + ep)); } catch (e) { console.log('warn', ep, e.message); }
-  }
+  const add = j => { let n = 0; (j && j.events || []).forEach(e => { if (String(e.idLeague) !== LEAGUE) return; n++; const k = e.idEvent || (e.strHomeTeam + e.strAwayTeam + e.dateEvent); if (!seen.has(k)) { seen.add(k); raw.push(e); } }); return n; };
+  const endpoints = ['eventspastleague.php?id=' + LEAGUE, 'eventsnextleague.php?id=' + LEAGUE, 'eventsseason.php?id=' + LEAGUE + '&s=2026', 'eventsseason.php?id=' + LEAGUE + '&s=2025-2026'];
   const day = 86400000;
-  for (let off = -2; off <= 1; off++) { const d = new Date(Date.now() + off * day).toISOString().slice(0, 10); try { add(await getJSON(base + 'eventsday.php?d=' + d + '&l=' + encodeURIComponent('FIFA World Cup'))); } catch (e) {} }
+  for (let off = -3; off <= 1; off++) endpoints.push('eventsday.php?d=' + new Date(Date.now() + off * day).toISOString().slice(0, 10) + '&l=' + encodeURIComponent('FIFA World Cup'));
+  for (const ep of endpoints) {
+    try { const j = await getJSON(base + ep); const n = add(j); console.log('  ' + ep + ' -> ' + (j && j.events ? j.events.length : 0) + ' events (' + n + ' WC)'); }
+    catch (e) { console.log('  FAIL ' + ep + ' : ' + e.message); }
+    await sleep(400);   // be gentle on the shared key
+  }
 
   const mapped = raw.map(mapEv).filter(e => e.home && e.away);
+  const scoredNow = mapped.filter(e => Number.isFinite(e.hs) && Number.isFinite(e.as));
+  console.log('Fetched ' + raw.length + ' WC events, ' + scoredNow.length + ' with scores. Recent scored:');
+  scoredNow.slice(-8).forEach(e => console.log('   ' + e.home + ' ' + e.hs + '-' + e.as + ' ' + e.away));
 
   // accumulate: merge with whatever is already cached so finished results never disappear
   let prev = [];
