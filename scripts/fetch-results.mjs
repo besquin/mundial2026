@@ -71,6 +71,6 @@ async function fromSportsDB() {
   const put = await fetch(FEED, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
   if (!put.ok) throw new Error('Firebase PUT failed ' + put.status + ' ' + (await put.text()));
   console.log('Wrote ' + events.length + ' events (' + events.filter(e => Number.isFinite(e.hs)).length + ' with scores) to Firebase.');
-  // Mirror to the legacy path so older still-open (read-only) tabs also show correct scores.
-  try { await fetch(DB + '/pools/_feedcache.json', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body }); } catch (e) {}
+  // Retire the abandoned legacy node: keep it cleared so nothing stale can live there.
+  try { await fetch(DB + '/pools/_feedcache.json', { method: 'DELETE' }); } catch (e) {}
 })().catch(e => { console.error(e); process.exit(1); });
