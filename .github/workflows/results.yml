@@ -2,25 +2,31 @@ name: Pull World Cup results
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # every ~10 minutes (free on public repos)
-  workflow_dispatch:           # lets you run it manually from the Actions tab
+    - cron: '*/10 * * * *'   # GitHub throttles this heavily; it just (re)starts the loop below
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: results
-  cancel-in-progress: false
+  cancel-in-progress: true   # a new (re)start replaces the running loop, keeping it fresh
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Fetch results and cache to Firebase
+          node-version: '22'
+      - name: Continuously fetch results into Firebase (~every 2 min for ~5h)
         env:
           FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
-        run: node scripts/fetch-results.mjs
+        run: |
+          end=$((SECONDS+18000))   # ~5 hours
+          while [ $SECONDS -lt $end ]; do
+            node scripts/fetch-results.mjs || true
+            sleep 120
+          done
