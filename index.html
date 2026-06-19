@@ -1530,6 +1530,16 @@ function ingest(events){
   return{matches,scores,sched,standings,groups,proj,groupComplete,ko,koMatches,champion,third};
 }
 let _fbFeed=null;   // shared results cached in Firebase (written by whoever can fetch)
+// Accumulate results: never drop a match we've already seen finished, since the feed's
+// "recent results" window only returns the latest ~15 games at a time.
+function mergeEvents(a,b){
+  const m={};const key=e=>{const hc=codeOf(e.home),ac=codeOf(e.away);return (hc&&ac)?[hc,ac].sort().join('|'):((e.home||'')+'|'+(e.away||''));};
+  (Array.isArray(a)?a:(a?Object.values(a):[])).forEach(e=>{if(e&&e.home)m[key(e)]=e;});
+  (Array.isArray(b)?b:(b?Object.values(b):[])).forEach(e=>{if(!e||!e.home)return;const k=key(e);const old=m[k];
+    const ns=Number.isFinite(e.hs)&&Number.isFinite(e.as),os=old&&Number.isFinite(old.hs)&&Number.isFinite(old.as);
+    if(!old||ns||!os)m[k]=e;});   // fresh wins, but never replace a scored result with an unscored one
+  return Object.values(m);
+}
 function applyEvents(events,source,atMs){
   let out;try{out=ingest(events||[]);}catch(e){console.warn('feed ingest failed',e);return;}
   state.results.matches=out.matches;state.results.scores=out.scores;state.schedule=out.sched||{};state.standings=out.standings;state.proj=out.proj;state.groupComplete=out.groupComplete;
@@ -1545,8 +1555,9 @@ async function fetchLive(){
   if(CONFIG.resultsEndpoint){try{const r=await fetch(CONFIG.resultsEndpoint,{cache:'no-store'});if(r.ok){const d=await r.json();data={events:(d.matches||[]).map(m=>({...m,stage:'GROUP'})),source:d.source,lastUpdated:d.lastUpdated};}}catch(e){}}
   if(!data){try{data=await fetchSportsDB();}catch(e){if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e.message||e))})</span>`;}}
   if(data){
-    applyEvents(data.events,data.source,Date.now());
-    Store.saveFeed({events:data.events,at:Date.now(),source:data.source});   // share with everyone
+    const merged=mergeEvents(_fbFeed&&_fbFeed.events,data.events);   // accumulate so finished results never disappear
+    applyEvents(merged,data.source,Date.now());
+    Store.saveFeed({events:merged,at:Date.now(),source:data.source});   // share with everyone
   } else if(_fbFeed&&_fbFeed.events){
     applyEvents(_fbFeed.events,(_fbFeed.source||'cache')+' · shared',_fbFeed.at);   // our fetch was blocked — use the shared cache
   } else if(!Object.keys(state.schedule).length){
