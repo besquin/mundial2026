@@ -709,6 +709,8 @@ const Store=(()=>{
   const JB='https://jsonblob.com/api/jsonBlob';
   let mode='local',poolId=null,poolError=false,db=null,fns=null;
   const listeners=[]; const emit=v=>listeners.forEach(fn=>fn(v));
+  const feedListeners=[];
+  const FEEDPATH='pools/_feedcache';   // shared live-results cache (one fetch feeds everyone)
   const LK='wc_entries';
   const bc=('BroadcastChannel'in window)?new BroadcastChannel('wc26'):null;
   const localLoad=()=>JSON.parse(localStorage.getItem(LK)||'{}');
@@ -719,7 +721,7 @@ const Store=(()=>{
   function startPoll(){const tick=async()=>{try{const d=await poolGet();poolError=false;emit(d.entries||{});}catch(e){poolError=true;}};tick();setInterval(tick,CONFIG.entriesPollMs);}
   async function createPool(){const r=await fetch(JB,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({entries:{},createdAt:Date.now()})});if(!r.ok)throw new Error('create '+r.status);let id=r.headers.get('X-jsonblob');if(!id){const loc=r.headers.get('Location');if(loc)id=loc.split('/').pop();}if(!id)throw new Error('no id');poolId=id;mode='pool';poolError=false;localStorage.setItem('wc_pool',id);setHash(id);startPoll();return id;}
   async function init(){
-    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,DBPATH),s=>emit(s.val()||{}));mode='cloud';return mode;}catch(e){console.warn(e);}}
+    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,DBPATH),s=>emit(s.val()||{}));d.onValue(d.ref(db,FEEDPATH),s=>{const v=s.val();if(v)feedListeners.forEach(fn=>fn(v));});mode='cloud';return mode;}catch(e){console.warn(e);}}
     poolId=poolFromUrl()||localStorage.getItem('wc_pool')||null;
     if(poolId){mode='pool';localStorage.setItem('wc_pool',poolId);setHash(poolId);startPoll();return mode;}
     mode='local';const fire=()=>emit(localLoad());window.addEventListener('storage',fire);if(bc)bc.onmessage=fire;setTimeout(fire,0);return mode;
@@ -730,7 +732,8 @@ const Store=(()=>{
     if(mode==='pool'){let d;try{d=await poolGet();}catch(e){d={entries:{}};}d.entries=d.entries||{};d.entries[id]=entry;await poolPut(d);emit(d.entries);return;}
     const l=localLoad();l[id]=entry;localStorage.setItem(LK,JSON.stringify(l));emit(l);if(bc)bc.postMessage('x');
   }
-  return{init,saveEntry,onEntries:fn=>listeners.push(fn),get mode(){return mode;},get poolId(){return poolId;},get poolError(){return poolError;},get shareUrl(){return mode==='cloud'?(location.origin+location.pathname+('?g='+GROUPKEY)):(poolId?(location.origin+location.pathname+'#pool='+poolId):null);}};
+  function saveFeed(o){if(mode==='cloud'&&db&&fns){try{fns.set(fns.ref(db,FEEDPATH),o);}catch(e){}}}
+  return{init,saveEntry,saveFeed,onEntries:fn=>listeners.push(fn),onFeed:fn=>feedListeners.push(fn),get mode(){return mode;},get poolId(){return poolId;},get poolError(){return poolError;},get shareUrl(){return mode==='cloud'?(location.origin+location.pathname+('?g='+GROUPKEY)):(poolId?(location.origin+location.pathname+'#pool='+poolId):null);}};
 })();
 
 /* =========================== HELPERS =========================== */
@@ -1525,19 +1528,29 @@ function ingest(events){
   const groupComplete=Object.keys(matches).length===MATCHES.length;
   return{matches,scores,sched,standings,groups,proj,groupComplete,ko,koMatches,champion,third};
 }
+let _fbFeed=null;   // shared results cached in Firebase (written by whoever can fetch)
+function applyEvents(events,source,atMs){
+  const out=ingest(events||[]);
+  state.results.matches=out.matches;state.results.scores=out.scores;state.schedule=out.sched||{};state.standings=out.standings;state.proj=out.proj;state.groupComplete=out.groupComplete;
+  state.actual.groups=out.groups;state.actual.wildcards=out.groupComplete?out.proj:[];state.actual.ko=out.ko;state.actual.koMatches=out.koMatches;state.actual.champion=out.champion;state.actual.third=out.third;
+  state.feed={source:source||'none',lastUpdated:atMs?new Date(atMs).toISOString():new Date().toISOString(),played:Object.keys(out.matches).length};
+  renderBoard();renderResults();refreshSummary();
+}
 async function fetchLive(){
+  const pm=CONFIG.pollMs||60000;
+  // if another player fetched very recently, reuse the shared Firebase cache (don't hammer the feed)
+  if(_fbFeed&&_fbFeed.events&&_fbFeed.at&&Date.now()-_fbFeed.at<pm*0.9){applyEvents(_fbFeed.events,(_fbFeed.source||'thesportsdb')+' · shared',_fbFeed.at);return;}
   let data=null;
   if(CONFIG.resultsEndpoint){try{const r=await fetch(CONFIG.resultsEndpoint,{cache:'no-store'});if(r.ok){const d=await r.json();data={events:(d.matches||[]).map(m=>({...m,stage:'GROUP'})),source:d.source,lastUpdated:d.lastUpdated};}}catch(e){}}
   if(!data){try{data=await fetchSportsDB();}catch(e){if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e.message||e))})</span>`;}}
   if(data){
-    const out=ingest(data.events||[]);
-    state.results.matches=out.matches;state.results.scores=out.scores;state.schedule=out.sched||{};state.standings=out.standings;state.proj=out.proj;state.groupComplete=out.groupComplete;
-    state.actual.groups=out.groups;state.actual.wildcards=out.groupComplete?out.proj:[];state.actual.ko=out.ko;state.actual.koMatches=out.koMatches;state.actual.champion=out.champion;state.actual.third=out.third;
-    state.feed={source:data.source||'none',lastUpdated:data.lastUpdated||new Date().toISOString(),played:Object.keys(out.matches).length};
+    applyEvents(data.events,data.source,Date.now());
+    Store.saveFeed({events:data.events,at:Date.now(),source:data.source});   // share with everyone
+  } else if(_fbFeed&&_fbFeed.events){
+    applyEvents(_fbFeed.events,(_fbFeed.source||'cache')+' · shared',_fbFeed.at);   // our fetch was blocked — use the shared cache
   } else if(!Object.keys(state.schedule).length){
-    state.schedule=ingest([]).sched||{};   // feed unreachable on first load — still show the static fixture schedule
+    state.schedule=ingest([]).sched||{};renderBoard();renderResults();refreshSummary();   // nothing yet — at least show fixtures
   }
-  renderBoard();renderResults();refreshSummary();
 }
 
 /* =========================== WIRING =========================== */
@@ -1619,6 +1632,7 @@ function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(ur
   loadDraft();$('#playerPin').value=localStorage.getItem('wc_pin_'+STOREKEY)||'';recomputeQualifiers();applyAll();
   let _meLoaded=false;
   Store.onEntries(d=>{state.entries=d||{};renderBoard();renderSchedule();renderStats();if(ME&&!_meLoaded&&state.entries[state.myId]){_meLoaded=true;loadEntryIntoForm(state.entries[state.myId]);switchTab('picks');}});
+  Store.onFeed(v=>{if(!v||!v.events)return;_fbFeed=v;if(!Object.keys(state.results.matches).length||(v.at&&(!state.feed.lastUpdated||new Date(v.at)>new Date(state.feed.lastUpdated))))applyEvents(v.events,(v.source||'thesportsdb')+' · shared',v.at);});
   await Store.init();setModeBanner();
   tickClock();setInterval(tickClock,1000);
   fetchLive();
