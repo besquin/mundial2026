@@ -720,6 +720,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
+const APPVER=3;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -737,7 +738,9 @@ const Store=(()=>{
   function startPoll(){const tick=async()=>{try{const d=await poolGet();poolError=false;emit(d.entries||{});}catch(e){poolError=true;}};tick();setInterval(tick,CONFIG.entriesPollMs);}
   async function createPool(){const r=await fetch(JB,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({entries:{},createdAt:Date.now()})});if(!r.ok)throw new Error('create '+r.status);let id=r.headers.get('X-jsonblob');if(!id){const loc=r.headers.get('Location');if(loc)id=loc.split('/').pop();}if(!id)throw new Error('no id');poolId=id;mode='pool';poolError=false;localStorage.setItem('wc_pool',id);setHash(id);startPoll();return id;}
   async function init(){
-    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,DBPATH),s=>emit(s.val()||{}));d.onValue(d.ref(db,FEEDPATH),s=>{const v=s.val();if(v)feedListeners.forEach(fn=>fn(v));});mode='cloud';return mode;}catch(e){console.warn(e);}}
+    if(FB){try{const a=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');const d=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');const app=a.initializeApp(CONFIG.firebase);db=d.getDatabase(app);fns=d;d.onValue(d.ref(db,DBPATH),s=>emit(s.val()||{}));d.onValue(d.ref(db,FEEDPATH),s=>{const v=s.val();if(v)feedListeners.forEach(fn=>fn(v));});
+      d.onValue(d.ref(db,'pools/_appver'),s=>{const v=+s.val()||0;if(v>APPVER){location.reload();}else if(v<APPVER){try{d.set(d.ref(db,'pools/_appver'),APPVER);}catch(e){}}});  // auto-reload stale tabs on new deploys
+      mode='cloud';return mode;}catch(e){console.warn(e);}}
     poolId=poolFromUrl()||localStorage.getItem('wc_pool')||null;
     if(poolId){mode='pool';localStorage.setItem('wc_pool',poolId);setHash(poolId);startPoll();return mode;}
     mode='local';const fire=()=>emit(localLoad());window.addEventListener('storage',fire);if(bc)bc.onmessage=fire;setTimeout(fire,0);return mode;

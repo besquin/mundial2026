@@ -70,4 +70,6 @@ async function fromSportsDB() {
   const put = await fetch(FEED, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ events, at: Date.now(), source: FD_TOKEN ? 'football-data' : 'thesportsdb' }) });
   if (!put.ok) throw new Error('Firebase PUT failed ' + put.status + ' ' + (await put.text()));
   console.log('Wrote ' + events.length + ' events (' + events.filter(e => Number.isFinite(e.hs)).length + ' with scores) to Firebase.');
+  // Keep the abandoned old cache node cleared so no stale browser can ever show it again.
+  try { await fetch(DB + '/pools/_feedcache.json', { method: 'DELETE' }); } catch (e) {}
 })().catch(e => { console.error(e); process.exit(1); });
