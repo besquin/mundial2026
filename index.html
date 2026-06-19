@@ -1490,15 +1490,20 @@ async function fetchSportsDB(){
 }
 function ingest(events){
   events=Array.isArray(events)?events:(events&&typeof events==='object'?Object.values(events):[]);   // tolerate Firebase array-as-object
+  // dedup by match (the cache can merge multiple sources) so standings never double-count
+  {const _m={};events.forEach(e=>{if(!e||!e.home)return;const hc=codeOf(e.home),ac=codeOf(e.away);const k=(hc&&ac)?[hc,ac].sort().join('|'):(e.home+'|'+e.away);const old=_m[k];const sc=Number.isFinite(e.hs)&&Number.isFinite(e.as);const os=old&&Number.isFinite(old.hs)&&Number.isFinite(old.as);if(!old||(sc&&!os))_m[k]=e;});events=Object.values(_m);}
   const matches={};const scores={};const sched={};const tbl={};GLETTERS.forEach(g=>{tbl[g]={};GROUPS[g].forEach(t=>tbl[g][t[0]]={code:t[0],p:0,w:0,d:0,gf:0,ga:0});});
+  // Dates/times come from the official static schedule in the viewer's timezone; the feed only supplies scores.
+  MATCHES.forEach(m=>{const ms=STATIC_MS[m.id];if(ms==null)return;const dt=new Date(ms);
+    sched[m.id]={date:dt.toLocaleDateString('en-CA'),time:dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),venue:null,status:null,fin:false,ended:Date.now()>ms+150*60000};});
   const ko={R16:[],QF:[],SF:[],F:[]};const koMatches=[];let champion=null,third=null;
   (events||[]).forEach(ev=>{
     const hc=codeOf(ev.home),ac=codeOf(ev.away);if(!hc||!ac)return;
     const mm0=PAIR2MATCH[[hc,ac].sort().join('|')];
-    if(ev.stage==='GROUP'&&mm0)sched[mm0.id]={date:ev.date,time:ev.time,venue:ev.venue,status:ev.status,fin:ev.fin,ended:ev.ended,hs:ev.hs,as:ev.as}; // schedule shown even before kickoff
     if(ev.stage==='GROUP'){
+      const sd=mm0&&sched[mm0.id];if(sd){if(ev.status)sd.status=ev.status;if(ev.fin)sd.fin=true;if(ev.venue)sd.venue=ev.venue;}   // feed updates status only, keeps static date/time
       const hs=ev.hs,as=ev.as;if(!Number.isFinite(hs)||!Number.isFinite(as))return;
-      const mm=mm0;if(mm){const win=hs>as?hc:as>hs?ac:null;matches[mm.id]=win===null?'draw':(win===mm.home?'home':'away');scores[mm.id]=(hc===mm.home)?{h:hs,a:as}:{h:as,a:hs};}
+      const mm=mm0;if(mm){const win=hs>as?hc:as>hs?ac:null;matches[mm.id]=win===null?'draw':(win===mm.home?'home':'away');scores[mm.id]=(hc===mm.home)?{h:hs,a:as}:{h:as,a:hs};if(sched[mm.id])sched[mm.id].fin=true;}
       const g=TEAMGROUP[hc];if(g&&TEAMGROUP[ac]===g){const H=tbl[g][hc],A=tbl[g][ac];H.p++;A.p++;H.gf+=hs;H.ga+=as;A.gf+=as;A.ga+=hs;if(hs>as){H.w++;}else if(as>hs){A.w++;}else{H.d++;A.d++;}}
     } else if(['R16','QF','SF','F'].includes(ev.stage)){
       if(!ko[ev.stage].includes(hc))ko[ev.stage].push(hc);
@@ -1512,9 +1517,6 @@ function ingest(events){
       if(win)third=win;
     }
   });
-  // fill any group fixture the live feed hasn't published yet from the official static schedule
-  MATCHES.forEach(m=>{if(sched[m.id])return;const ms=STATIC_MS[m.id];if(ms==null)return;const dt=new Date(ms);
-    sched[m.id]={date:dt.toLocaleDateString('en-CA'),time:dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),venue:null,status:null,fin:false,ended:Date.now()>ms+150*60000,hs:null,as:null};});
   const standings={};const groups={};
   GLETTERS.forEach(g=>{
     const arr=Object.values(tbl[g]).map(t=>({...t,gd:t.gf-t.ga,pts:t.w*3+t.d}));
@@ -1548,9 +1550,9 @@ function applyEvents(events,source,atMs){
   renderBoard();renderResults();refreshSummary();
 }
 async function fetchLive(){
-  const pm=CONFIG.pollMs||60000;
-  // if another player fetched very recently, reuse the shared Firebase cache (don't hammer the feed)
-  if(_fbFeed&&_fbFeed.events&&_fbFeed.at&&Date.now()-_fbFeed.at<pm*0.9){applyEvents(_fbFeed.events,(_fbFeed.source||'thesportsdb')+' · shared',_fbFeed.at);return;}
+  // The GitHub Action refreshes the shared cache every ~10 min; if the cache is recent,
+  // just use it and don't hit TheSportsDB from the browser at all.
+  if(_fbFeed&&_fbFeed.events&&_fbFeed.at&&Date.now()-_fbFeed.at<11*60000){applyEvents(_fbFeed.events,(_fbFeed.source||'thesportsdb')+' · shared',_fbFeed.at);return;}
   let data=null;
   if(CONFIG.resultsEndpoint){try{const r=await fetch(CONFIG.resultsEndpoint,{cache:'no-store'});if(r.ok){const d=await r.json();data={events:(d.matches||[]).map(m=>({...m,stage:'GROUP'})),source:d.source,lastUpdated:d.lastUpdated};}}catch(e){}}
   if(!data){try{data=await fetchSportsDB();}catch(e){if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e.message||e))})</span>`;}}
