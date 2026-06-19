@@ -1566,21 +1566,19 @@ function applyEvents(events,source,atMs){
   renderBoard();renderResults();refreshSummary();
 }
 async function fetchLive(){
-  // The GitHub Action refreshes the shared cache every ~10 min; if the cache is recent,
-  // just use it and don't hit TheSportsDB from the browser at all.
-  if(_fbFeed&&_fbFeed.events&&_fbFeed.at&&Date.now()-_fbFeed.at<11*60000){applyEvents(_fbFeed.events,(_fbFeed.source||'thesportsdb')+' · shared',_fbFeed.at);return;}
-  let data=null;
-  if(CONFIG.resultsEndpoint){try{const r=await fetch(CONFIG.resultsEndpoint,{cache:'no-store'});if(r.ok){const d=await r.json();data={events:(d.matches||[]).map(m=>({...m,stage:'GROUP'})),source:d.source,lastUpdated:d.lastUpdated};}}catch(e){}}
-  if(!data){try{data=await fetchSportsDB();}catch(e){if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Waiting for the live feed… <span class="muted">(${escapeHtml(String(e.message||e))})</span>`;}}
-  if(data){
-    const merged=mergeEvents(_fbFeed&&_fbFeed.events,data.events);   // accumulate so finished results never disappear
-    applyEvents(merged,data.source,Date.now());
-    Store.saveFeed({events:merged,at:Date.now(),source:data.source});   // share with everyone
-  } else if(_fbFeed&&_fbFeed.events){
-    applyEvents(_fbFeed.events,(_fbFeed.source||'cache')+' · shared',_fbFeed.at);   // our fetch was blocked — use the shared cache
-  } else if(!Object.keys(state.schedule).length){
-    state.schedule=ingest([]).sched||{};renderBoard();renderResults();refreshSummary();   // nothing yet — at least show fixtures
+  // Results are produced server-side by the GitHub Action and shared via Firebase.
+  // Browsers are READ-ONLY: never write the shared cache (a browser can only reach a
+  // capped feed and would clobber the full results). Just show the shared cache.
+  if(_fbFeed&&_fbFeed.events&&(Array.isArray(_fbFeed.events)?_fbFeed.events.length:Object.keys(_fbFeed.events).length)){
+    applyEvents(_fbFeed.events,(_fbFeed.source||'live')+' · shared',_fbFeed.at);return;
   }
+  // No shared results yet (Action hasn't written, or non-cloud mode) — try a direct read
+  // for THIS browser's display only, and do NOT save it to the shared cache.
+  let data=null;
+  if(CONFIG.resultsEndpoint){try{const r=await fetch(CONFIG.resultsEndpoint,{cache:'no-store'});if(r.ok){const d=await r.json();data={events:(d.matches||[]).map(m=>({...m,stage:'GROUP'})),source:d.source};}}catch(e){}}
+  if(!data){try{data=await fetchSportsDB();}catch(e){if($('#resStatus'))$('#resStatus').innerHTML=`⏳ Waiting for live results… <span class="muted">(updates automatically)</span>`;}}
+  if(data)applyEvents(data.events,data.source,Date.now());
+  else if(!Object.keys(state.schedule).length){state.schedule=ingest([]).sched||{};renderBoard();renderResults();refreshSummary();}
 }
 
 /* =========================== WIRING =========================== */
