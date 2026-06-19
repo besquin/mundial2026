@@ -67,9 +67,10 @@ async function fromSportsDB() {
   fresh.forEach(e => { const k = key(e); const old = m[k]; const ns = Number.isFinite(e.hs) && Number.isFinite(e.as), os = old && Number.isFinite(old.hs) && Number.isFinite(old.as); if (!old || ns || !os) m[k] = e; });
   const events = Object.values(m);
 
-  const put = await fetch(FEED, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ events, at: Date.now(), source: FD_TOKEN ? 'football-data' : 'thesportsdb' }) });
+  const body = JSON.stringify({ events, at: Date.now(), source: FD_TOKEN ? 'football-data' : 'thesportsdb' });
+  const put = await fetch(FEED, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
   if (!put.ok) throw new Error('Firebase PUT failed ' + put.status + ' ' + (await put.text()));
   console.log('Wrote ' + events.length + ' events (' + events.filter(e => Number.isFinite(e.hs)).length + ' with scores) to Firebase.');
-  // Keep the abandoned old cache node cleared so no stale browser can ever show it again.
-  try { await fetch(DB + '/pools/_feedcache.json', { method: 'DELETE' }); } catch (e) {}
+  // Mirror to the legacy path so older still-open (read-only) tabs also show correct scores.
+  try { await fetch(DB + '/pools/_feedcache.json', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body }); } catch (e) {}
 })().catch(e => { console.error(e); process.exit(1); });
