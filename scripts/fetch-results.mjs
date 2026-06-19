@@ -67,7 +67,10 @@ async function fromSportsDB() {
   fresh.forEach(e => { const k = key(e); const old = m[k]; const ns = Number.isFinite(e.hs) && Number.isFinite(e.as), os = old && Number.isFinite(old.hs) && Number.isFinite(old.as); if (!old || ns || !os) m[k] = e; });
   const events = Object.values(m);
 
-  const body = JSON.stringify({ events, at: Date.now(), source: FD_TOKEN ? 'football-data' : 'thesportsdb' });
+  // `w:'srv'` marks this as a server (GitHub Action) write. Firebase rules require
+  // this marker to write _results/_feedcache, so stale old-build browser tabs can
+  // still read these nodes but can no longer clobber them with capped data.
+  const body = JSON.stringify({ events, at: Date.now(), source: FD_TOKEN ? 'football-data' : 'thesportsdb', w: 'srv' });
   const put = await fetch(FEED, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
   if (!put.ok) throw new Error('Firebase PUT failed ' + put.status + ' ' + (await put.text()));
   console.log('Wrote ' + events.length + ' events (' + events.filter(e => Number.isFinite(e.hs)).length + ' with scores) to Firebase.');

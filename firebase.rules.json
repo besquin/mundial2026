@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "entries": { ".read": true, ".write": true },
+    "pools": {
+      "_results":   { ".read": true, ".write": "newData.child('w').val() === 'srv'" },
+      "_feedcache": { ".read": true, ".write": "newData.child('w').val() === 'srv'" },
+      "_appver":    { ".read": true, ".write": true },
+      "$pool":      { ".read": true, ".write": true }
+    }
+  }
+}
