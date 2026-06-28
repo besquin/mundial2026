@@ -374,6 +374,7 @@
     <button class="tab active" data-tab="board">🏆 Leaderboard</button>
     <button class="tab" data-tab="results">📅 Schedule</button>
     <button class="tab" data-tab="stats">📊 Stats</button>
+    <button class="tab" data-tab="rules">📜 Rules</button>
     <button class="tab" data-tab="picks">📝 My Picks</button>
   </div>
 
@@ -514,6 +515,7 @@
 
   <!-- ===== STATS ===== -->
   <section id="tab-stats" class="hide"><div id="statsBody"></div></section>
+  <section id="tab-rules" class="hide"><div id="rulesBody"></div></section>
 
   <div id="entryModal" class="modal hide"><div class="modalbox" id="modalBox"><button class="modalx" id="modalClose">✕</button><div id="modalBody"></div></div></div>
 
@@ -720,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=4;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=5;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1592,7 +1594,7 @@ async function fetchLive(){
 }
 
 /* =========================== WIRING =========================== */
-function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$('#tab-picks').classList.toggle('hide',name!=='picks');$('#tab-board').classList.toggle('hide',name!=='board');$('#tab-results').classList.toggle('hide',name!=='results');$('#tab-stats').classList.toggle('hide',name!=='stats');if(name==='stats')renderStats();if(name!=='picks')fetchLive();}
+function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));$('#tab-picks').classList.toggle('hide',name!=='picks');$('#tab-board').classList.toggle('hide',name!=='board');$('#tab-results').classList.toggle('hide',name!=='results');$('#tab-stats').classList.toggle('hide',name!=='stats');$('#tab-rules').classList.toggle('hide',name!=='rules');if(name==='stats')renderStats();if(name==='rules')renderRulesTab();if(name!=='picks'&&name!=='rules')fetchLive();}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('#refreshNow').onclick=fetchLive;
 document.querySelectorAll('.subtab').forEach(b=>b.onclick=()=>switchSub(b.dataset.sub));
@@ -1657,6 +1659,44 @@ function renderScoreRules(){const S=CONFIG.scoring;$('#scoreRules').innerHTML=`<
   <li>Correct <b>🥉 3rd-place</b> winner: <b>+${S.third}</b></li>
   <li>Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet & you pick the winner)</li>
   <li>Max <b>${maxPoints()}</b> pts · auto-scored from a live feed</li></ul>`;}
+function renderRulesTab(){const S=CONFIG.scoring;const box=$('#rulesBody');if(!box)return;
+  const N=Object.keys(state.entries||{}).length;
+  const feeNum=Number(String(CONFIG.entryFee||'').replace(/[^0-9.]/g,''))||0;
+  const pot=(feeNum&&N)?String(CONFIG.entryFee).replace(/[0-9.,]+/,(feeNum*N).toLocaleString('en-US')):null;
+  const hd=t=>`<div class="muted" style="font-weight:800;color:var(--txt);margin:16px 0 6px;font-size:15px">${t}</div>`;
+  const ul=items=>`<ul style="margin:0;padding-left:18px;line-height:1.75">${items.map(i=>'<li>'+i+'</li>').join('')}</ul>`;
+  const prizeRows=(CONFIG.prizes||[]).map(p=>`<div class="lbr" style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)"><span>${p.place}</span><b>${p.prize}</b></div>`).join('');
+  box.innerHTML=`
+  <div class="card">
+    <h2>📜 Scoring Rules</h2>
+    <p class="muted">Everything is <b>auto-scored</b> from a live results feed — no manual entry, and entries are locked for the tournament. Here's exactly how points are earned.</p>
+    ${hd('⚽ Group stage')}
+    ${ul([
+      `<b>+${S.match}</b> correct match result (win / draw / loss)`,
+      `<b>+${S.exactScore}</b> exact scoreline 🎯 — a bonus on top, awarded on <b>every</b> match (group & knockout)`,
+      `<b>+${S.first}</b> correct group winner · <b>+${S.second}</b> correct runner-up — for each of the 12 groups`,
+      `<b>+${S.wildcard}</b> each correct wild card (one of the 8 best 3rd-placed teams that advance)`
+    ])}
+    ${hd('🏆 Knockout — how teams advance')}
+    ${ul([
+      `Your bracket is auto-seeded from your predicted group 1st/2nd places + your 8 wild cards.`,
+      `In every tie, the team with the <b>higher score you entered advances</b> — no draws. A level score means you picked the <b>penalty-shootout winner</b> (counted as +1 goal).`,
+      `Path: Round of 32 → Round of 16 → Quarter-finals → Semi-finals → Final, plus a 🥉 3rd-place playoff between the semifinal losers.`
+    ])}
+    ${hd('🎯 Knockout points (per team you correctly send to each round)')}
+    ${ul([
+      `Round of 32: <b>+0</b> — already rewarded through your group & wild-card picks`,
+      `Round of 16: <b>+${S.r16}</b> · Quarter-finals: <b>+${S.qf}</b> · Semi-finals: <b>+${S.sf}</b>`,
+      `Each finalist: <b>+${S.finalist}</b> · Champion: <b>+${S.champion}</b> · 🥉 3rd-place winner: <b>+${S.third}</b>`,
+      `Bonus <b>+${S.matchupBonus}</b> for each exact knockout tie you nail (both teams meet <i>and</i> you pick the winner)`
+    ])}
+    <p class="muted" style="font-style:italic;border-left:3px solid var(--gold);padding-left:10px;margin:14px 0 0">💡 Points scale up every round — the bracket (champion <b>+${S.champion}</b>, finalists <b>+${S.finalist}</b>) is where the leaderboard is really decided. Maximum possible: <b>${maxPoints()}</b> pts.</p>
+  </div>
+  <div class="card">
+    <h2>🏆 Prizes</h2>
+    <p class="muted">Buy-in: <b>${CONFIG.entryFee||'—'}</b>${pot?` · Current pot (${N} ${N===1?'entry':'entries'}): <b>${pot}</b>`:''}</p>
+    <div style="margin-top:6px">${prizeRows||'<span class="muted">—</span>'}</div>
+  </div>`;}
 function setModeBanner(){const dot=$('#liveDot'),txt=$('#liveText'),b=$('#modeBanner');if(Store.mode==='cloud'||Store.mode==='pool'){if(dot)dot.classList.remove('off');if(txt)txt.textContent='Live · shared';b.className='banner ok';b.innerHTML='🟢 <b>Live shared mode.</b> One leaderboard for everyone, auto-scored — no manual entry.';}else{if(dot)dot.classList.add('off');if(txt)txt.textContent='Ready';b.className='banner warn';b.innerHTML='👋 <b>Welcome!</b> Fill your picks and hit <b>Submit</b> — that creates a shared pool and an invite link for friends.';}renderShare();}
 function renderShare(){const url=Store.shareUrl;const card=$('#shareCard');if(url){$('#shareUrl').value=url;card.classList.remove('hide');}else card.classList.add('hide');if(Store.poolError){const b=$('#modeBanner');b.className='banner warn';b.innerHTML='⚠️ Couldn\'t reach the shared store — picks saved on this device. Use <b>Copy my pick code</b> to share, or try again later.';}}
 
