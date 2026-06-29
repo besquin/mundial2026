@@ -722,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=5;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=6;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1370,6 +1370,54 @@ function showMatchPredictions(id){
     '<div class="mp-list">'+list+'</div>';
   $('#entryModal').classList.remove('hide');
 }
+// Points one player earned that are attributable to a single actual knockout match:
+// advancement of the two teams into this round, plus matchup & exact-score bonuses.
+function koMatchScoreFor(e,km){
+  const S=CONFIG.scoring;const sm=seedMapFor(e);const [x,y]=km.pair.split('|');
+  const advE=bracketAdvancers(e);
+  const rkey={R16:'R16',QF:'QF',SF:'SF',F:'F'}[km.round];
+  const rp={R16:S.r16,QF:S.qf,SF:S.sf,F:S.finalist}[km.round]||0;
+  let pts=0;const advTeams=[];
+  if(rkey){[x,y].forEach(t=>{if((advE[rkey]||[]).includes(t)&&(state.actual.ko[rkey]||[]).includes(t)){pts+=rp;advTeams.push(t);}});}
+  if(km.round==='F'&&advE.champion&&state.actual.champion&&advE.champion===state.actual.champion)pts+=S.champion;
+  if(km.round==='3P'){const myThird=e.bracket&&(e.bracket[BRONZEID]||e.bracket.B);if(myThird&&state.actual.third&&myThird===state.actual.third)pts+=S.third;}
+  // did this player predict this exact tie (both teams meeting here)?
+  let predG=null,predWinner=null,predPair=false;
+  for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);if(!a||!b)continue;if([a,b].sort().join('|')===km.pair){predPair=true;predWinner=(e.bracket&&e.bracket[m.id])||null;const sc=e.koScores&&e.koScores[m.id];if(sc&&Number.isFinite(sc.h)&&Number.isFinite(sc.a))predG={[a]:sc.h,[b]:sc.a};break;}}
+  let exact=false,tieWin=false;
+  if(predPair){
+    if(predWinner&&km.winner&&predWinner===km.winner){pts+=S.matchupBonus;tieWin=true;}
+    if(predG&&km.g&&Number.isFinite(km.g[x])&&Number.isFinite(km.g[y])&&predG[x]===km.g[x]&&predG[y]===km.g[y]){pts+=S.exactScore;exact=true;}
+  }
+  return{pts,predPair,predG,predWinner,exact,tieWin,advTeams,x,y};
+}
+// Per-player picks for one knockout tie (opens when a knockout card is tapped).
+function showKoMatchPredictions(pair,round){
+  const km=(state.actual.koMatches||[]).find(k=>k.pair===pair&&k.round===round);if(!km)return;
+  const [x,y]=km.pair.split('|');const X=TEAM[x],Y=TEAM[y];if(!X||!Y)return;
+  const body=$('#modalBody');const box=$('#modalBox');if(box)box.classList.remove('wide');
+  if(!picksRevealed()){body.innerHTML='<h3>🔒 Picks hidden</h3><p class="muted">Everyone’s predictions unlock during the tournament.</p>';$('#entryModal').classList.remove('hide');return;}
+  const g=km.g||{};const fin=Number.isFinite(g[x])&&Number.isFinite(g[y]);
+  const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'}[km.round]||km.round;
+  const rows=Object.keys(state.entries).map(eid=>{
+    const e=state.entries[eid];const r=koMatchScoreFor(e,km);
+    let pick='<span class="muted">—</span>',mark='✗',cls='miss';
+    if(r.predPair){pick=(r.predG?(r.predG[x]+' – '+r.predG[y]):'matchup ✓')+(r.predWinner&&TEAM[r.predWinner]?' '+TEAM[r.predWinner][2]:'');}
+    else if(r.advTeams.length){pick='<span class="muted">had '+r.advTeams.map(t=>TEAM[t]?TEAM[t][2]:t).join(' & ')+' through</span>';}
+    if(r.exact){mark='🎯';cls='hit';}else if(r.tieWin){mark='✓';cls='ok';}else if(r.pts>0){mark='•';cls='ok';}
+    return{id:eid,name:e.name||'Anon',pick,pts:r.pts,mark,cls};
+  }).sort((a,b)=>b.pts-a.pts||a.name.localeCompare(b.name));
+  const sub=koLabel+(fin?' · <b style="color:var(--txt)">Result '+g[x]+'–'+g[y]+(km.winner&&TEAM[km.winner]?' ('+km.winner+')':'')+'</b>':' · Upcoming');
+  const list=rows.map(r=>'<div class="mp-row '+r.cls+'" onclick="showEntry(\''+r.id+'\')">'+
+    '<span class="mp-name">'+escapeHtml(r.name)+'</span>'+
+    '<span class="mp-sc">'+r.pick+'</span>'+
+    '<span class="mp-mk">'+(r.mark||'')+(r.pts?' <span class="muted">+'+r.pts+'</span>':'')+'</span></div>').join('');
+  body.innerHTML='<h3>'+X[2]+' '+escapeHtml(X[1])+' <span class="muted">vs</span> '+escapeHtml(Y[1])+' '+Y[2]+'</h3>'+
+    '<div class="muted" style="font-size:12px;margin-top:2px">'+sub+'</div>'+
+    '<div class="mp-list">'+list+'</div>'+
+    '<p class="muted" style="font-size:11px;margin-top:8px">Points are what each player earned for this tie: reaching the '+koLabel+', plus matchup (+'+CONFIG.scoring.matchupBonus+') and exact-score (+'+CONFIG.scoring.exactScore+') bonuses.</p>';
+  $('#entryModal').classList.remove('hide');
+}
 function renderPoolSummary(){
   const box=$('#poolSummary');if(!box)return;
   const N=Object.keys(state.entries).length;
@@ -1430,7 +1478,8 @@ function renderSchedule(){
     .map(km=>{const [x,y]=km.pair.split('|');const g=km.g||{};const fin=Number.isFinite(g[x])&&Number.isFinite(g[y]);
       const center=fin?('<div class="mc-score">'+g[x]+' <span>-</span> '+g[y]+'</div>'):'<div class="mc-vs">—<span>vs</span>—</div>';
       const stt=fin?{key:'fin',label:'Final'}:{key:'upc',label:'Upcoming'};
-      return '<div class="mcard s-'+stt.key+'"><div class="mc-top"><span class="mc-no">'+(koLabel[km.round]||km.round)+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
+      return '<div class="mcard click s-'+stt.key+'" onclick="showKoMatchPredictions(\''+km.pair+'\',\''+km.round+'\')">'+
+        '<div class="mc-top"><span class="mc-no">'+(koLabel[km.round]||km.round)+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
         '<div class="mc-teams">'+teamRow(x,'home')+center+teamRow(y,'away')+'</div></div>';}).join('');
   if(koCards)html+=section('ko','Knockout stage',null,'live results',koCards);
   root.innerHTML=html;
