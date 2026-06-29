@@ -15,7 +15,7 @@ async function getJSON(url, headers) { const r = await fetch(url, { headers: hea
 // ---- football-data.org (primary) ----
 async function fromFootballData() {
   if (!FD_TOKEN) { console.log('No FOOTBALL_DATA_TOKEN set — skipping football-data.org'); return []; }
-  const stageMap = { GROUP_STAGE: 'GROUP', LAST_16: 'R16', QUARTER_FINALS: 'QF', SEMI_FINALS: 'SF', THIRD_PLACE: '3P', FINAL: 'F' };
+  const stageMap = { GROUP_STAGE: 'GROUP', LAST_32: 'R32', LAST_16: 'R16', QUARTER_FINALS: 'QF', SEMI_FINALS: 'SF', THIRD_PLACE: '3P', FINAL: 'F' };
   const j = await getJSON('https://api.football-data.org/v4/competitions/WC/matches?season=2026', { 'X-Auth-Token': FD_TOKEN });
   const out = (j.matches || []).map(m => {
     const fin = m.status === 'FINISHED';

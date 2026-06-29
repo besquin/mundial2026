@@ -722,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=7;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=8;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1591,6 +1591,11 @@ function ingest(events){
       const hs=ev.hs,as=ev.as;if(!Number.isFinite(hs)||!Number.isFinite(as))return;
       const mm=mm0;if(mm){const win=hs>as?hc:as>hs?ac:null;matches[mm.id]=win===null?'draw':(win===mm.home?'home':'away');scores[mm.id]=(hc===mm.home)?{h:hs,a:as}:{h:as,a:hs};if(sched[mm.id])sched[mm.id].fin=true;}
       const g=TEAMGROUP[hc];if(g&&TEAMGROUP[ac]===g){const H=tbl[g][hc],A=tbl[g][ac];H.p++;A.p++;H.gf+=hs;H.ga+=as;A.gf+=as;A.ga+=hs;if(hs>as){H.w++;}else if(as>hs){A.w++;}else{H.d++;A.d++;}}
+    } else if(ev.stage==='R32'){
+      // Round of 32 (48-team format). Winners are the actual Round-of-16 teams.
+      let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac;
+      if(win&&!ko.R16.includes(win))ko.R16.push(win);
+      {const _ms=ev.date?Date.parse(ev.date):NaN;koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:'R32',g:{[hc]:ev.hs,[ac]:ev.as},ms:Number.isFinite(_ms)?_ms:null});}
     } else if(['R16','QF','SF','F'].includes(ev.stage)){
       if(!ko[ev.stage].includes(hc))ko[ev.stage].push(hc);
       if(!ko[ev.stage].includes(ac))ko[ev.stage].push(ac);
