@@ -722,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=6;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=7;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1340,6 +1340,21 @@ function groupCard(id,no){
     '<div class="mc-top"><span class="mc-no">'+(no?('Match '+no):('Group '+m.group))+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
     '<div class="mc-teams">'+teamRow(m.home,'home')+center+teamRow(m.away,'away')+'</div>'+pred+foot+'</div>';
 }
+const KOLABEL={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff',R32:'Round of 32'};
+function koStt(km){const g=km.g||{};const[x,y]=km.pair.split('|');
+  if(Number.isFinite(g[x])&&Number.isFinite(g[y]))return{key:'fin',label:'Final'};
+  if(km.ms&&Date.now()>km.ms+150*60000)return{key:'ended',label:'Awaiting result'};
+  if(km.ms&&new Date(km.ms).toDateString()===new Date().toDateString())return{key:'today',label:'Today'};
+  return{key:'upc',label:'Upcoming'};}
+function koCard(km){
+  const[x,y]=km.pair.split('|');const g=km.g||{};const stt=koStt(km);const fin=stt.key==='fin';
+  const center=fin?('<div class="mc-score">'+g[x]+' <span>-</span> '+g[y]+'</div>'):'<div class="mc-vs">—<span>vs</span>—</div>';
+  const fb=[];if(km.ms){const d=new Date(km.ms);fb.push('📅 '+fmtDate(d.toLocaleDateString('en-CA')));fb.push('🕐 '+fmtTime(d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})));}
+  const foot=fb.length?'<div class="mc-foot">'+fb.map(s=>'<span>'+s+'</span>').join('')+'</div>':'';
+  return '<div class="mcard click s-'+stt.key+'" onclick="showKoMatchPredictions(\''+km.pair+'\',\''+km.round+'\')">'+
+    '<div class="mc-top"><span class="mc-no">'+(KOLABEL[km.round]||km.round)+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
+    '<div class="mc-teams">'+teamRow(x,'home')+center+teamRow(y,'away')+'</div>'+foot+'</div>';
+}
 // Per-player predicted scores for one group match (opens when a card is tapped).
 function showMatchPredictions(id){
   const m=MBYID[id];if(!m)return;const H=TEAM[m.home],A=TEAM[m.away];
@@ -1441,47 +1456,48 @@ function renderSchedule(){
     .sort((a,b)=>((state.schedule[a.id].date+(state.schedule[a.id].time||''))<(state.schedule[b.id].date+(state.schedule[b.id].time||''))?-1:1));
   const noOf={};dated.forEach((m,i)=>noOf[m.id]=i+1);
   const today=new Date().toDateString();
-  const isToday=id=>{const sd=state.schedule[id];return !!(sd&&sd.date&&new Date(sd.date+'T12:00:00').toDateString()===today);};
-  const pass=id=>{const k=schedStatus(state.schedule[id]).key;
+  // Unified items: group matches (static dates) + knockout matches (feed kickoff times).
+  const items=[...MATCHES.map(m=>({kind:'g',id:m.id})),...(state.actual.koMatches||[]).map(km=>({kind:'k',km}))];
+  const itDay=it=>it.kind==='g'?((state.schedule[it.id]||{}).date||null):(it.km.ms?new Date(it.km.ms).toLocaleDateString('en-CA'):null);
+  const itMs=it=>it.kind==='g'?(STATIC_MS[it.id]||0):(it.km.ms||0);
+  const itStKey=it=>it.kind==='g'?schedStatus(state.schedule[it.id]).key:koStt(it.km).key;
+  const itHtml=it=>it.kind==='g'?groupCard(it.id,noOf[it.id]):koCard(it.km);
+  const isToday=it=>{const d=itDay(it);return !!(d&&new Date(d+'T12:00:00').toDateString()===today);};
+  const pass=it=>{const k=itStKey(it);
     if(filt==='final')return k==='fin';
-    if(filt==='today')return isToday(id);
+    if(filt==='today')return isToday(it);
     if(filt==='upcoming')return k!=='fin'&&k!=='ended';
     return true;};
   // group by calendar day
   const fmtDay=d=>{const dt=new Date(d+'T12:00:00');return isNaN(dt)?d:dt.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});};
   const byDay={};const noDay=[];
-  MATCHES.forEach(m=>{const sd=state.schedule[m.id];if(sd&&sd.date)(byDay[sd.date]=byDay[sd.date]||[]).push(m.id);else noDay.push(m.id);});
+  items.forEach(it=>{const d=itDay(it);if(d)(byDay[d]=byDay[d]||[]).push(it);else noDay.push(it);});
   let html='';
   // collapsed by default; expanded only if the user opened it (persisted) — or when a filter is active
   const isOpen=key=>filt!=='all'||_openSecs.has(key);
-  const section=(key,title,ids,sub,bodyHtml)=>{
-    let cards=bodyHtml;
-    if(cards==null){const order=ids.slice().sort((a,b)=>(noOf[a]||999)-(noOf[b]||999));cards=order.filter(pass).map(id=>groupCard(id,noOf[id])).join('');}
+  const section=(key,title,list,sub)=>{
+    const cards=list.slice().sort((a,b)=>itMs(a)-itMs(b)).filter(pass).map(itHtml).join('');
     if(filt!=='all'&&!cards)return '';                       // hide empty sections when filtering
-    const done=ids?ids.filter(id=>schedStatus(state.schedule[id]).key==='fin').length:0;
-    const pct=ids?Math.round(done/ids.length*100):0;
+    const done=list.filter(it=>itStKey(it)==='fin').length;
+    const pct=list.length?Math.round(done/list.length*100):0;
     return '<div class="sched-sec'+(isOpen(key)?'':' collapsed')+'" data-sk="'+key+'">'+
       '<div class="sec-head" onclick="toggleSec(this)"><div><h3>'+title+'</h3>'+
-      '<div class="sub">'+(sub||(ids.length+' match'+(ids.length===1?'':'es')+' · '+done+'/'+ids.length+' completed'))+'</div>'+
-      (ids?'<div class="sec-prog"><i style="width:'+pct+'%"></i></div>':'')+'</div><span class="sec-chev">▾</span></div>'+
+      '<div class="sub">'+(sub||(list.length+' match'+(list.length===1?'':'es')+' · '+done+'/'+list.length+' completed'))+'</div>'+
+      '<div class="sec-prog"><i style="width:'+pct+'%"></i></div></div><span class="sec-chev">▾</span></div>'+
       '<div class="mgrid">'+(cards||'<p class="muted" style="grid-column:1/-1">No matches match this filter.</p>')+'</div></div>';
   };
-  // Default view: today, then tomorrow, then yesterday. Filters override.
+  // Default view: today, then tomorrow, then yesterday. If that window is empty
+  // (e.g. between stages), fall back to the nearest past + upcoming match days.
   const off=n=>new Date(Date.now()+n*86400000).toLocaleDateString('en-CA');
   let dayKeys=Object.keys(byDay).sort();
-  if(filt==='all')dayKeys=[off(0),off(1),off(-1)].filter(d=>byDay[d]);
+  if(filt==='all'){
+    let dk=[off(0),off(1),off(-1)].filter(d=>byDay[d]);
+    if(!dk.length){const tk=off(0);const past=dayKeys.filter(d=>d<tk);const fut=dayKeys.filter(d=>d>tk);
+      dk=[past[past.length-1],fut[0]].filter(Boolean);if(!dk.length)dk=dayKeys.slice(-2);}
+    dayKeys=dk.sort();
+  }
   dayKeys.forEach(day=>{html+=section(day,fmtDay(day),byDay[day]);});
-  if(noDay.length)html+=section('tbd','⏳ Not yet in live feed',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the data feed to publish a kick-off time');
-  // knockout cards (resolved fixtures from the live feed)
-  const koLabel={R16:'Round of 16',QF:'Quarter-finals',SF:'Semi-finals',F:'Final',['3P']:'3rd-place playoff'};
-  const koCards=(state.actual.koMatches||[]).filter(km=>{const fin=km.winner||(km.g&&Object.values(km.g).every(v=>Number.isFinite(v)));return filt==='final'?fin:(filt==='upcoming'?!fin:(filt==='today'?false:true));})
-    .map(km=>{const [x,y]=km.pair.split('|');const g=km.g||{};const fin=Number.isFinite(g[x])&&Number.isFinite(g[y]);
-      const center=fin?('<div class="mc-score">'+g[x]+' <span>-</span> '+g[y]+'</div>'):'<div class="mc-vs">—<span>vs</span>—</div>';
-      const stt=fin?{key:'fin',label:'Final'}:{key:'upc',label:'Upcoming'};
-      return '<div class="mcard click s-'+stt.key+'" onclick="showKoMatchPredictions(\''+km.pair+'\',\''+km.round+'\')">'+
-        '<div class="mc-top"><span class="mc-no">'+(koLabel[km.round]||km.round)+'</span><span class="mc-badge b-'+stt.key+'">'+stt.label+'</span></div>'+
-        '<div class="mc-teams">'+teamRow(x,'home')+center+teamRow(y,'away')+'</div></div>';}).join('');
-  if(koCards)html+=section('ko','Knockout stage',null,'live results',koCards);
+  if(noDay.length)html+=section('tbd','⏳ Knockout — kickoff times pending',noDay,noDay.length+' match'+(noDay.length===1?'':'es')+' · waiting for the live feed to publish fixtures');
   root.innerHTML=html;
 }
 function toggleSec(h){const sec=h.parentElement;sec.classList.toggle('collapsed');const k=sec.getAttribute('data-sk');if(k){if(sec.classList.contains('collapsed'))_openSecs.delete(k);else _openSecs.add(k);}}
@@ -1579,11 +1595,11 @@ function ingest(events){
       if(!ko[ev.stage].includes(hc))ko[ev.stage].push(hc);
       if(!ko[ev.stage].includes(ac))ko[ev.stage].push(ac);
       let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac;
-      koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:ev.stage,g:{[hc]:ev.hs,[ac]:ev.as}});
+      {const _ms=ev.date?Date.parse(ev.date):NaN;koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:ev.stage,g:{[hc]:ev.hs,[ac]:ev.as},ms:Number.isFinite(_ms)?_ms:null});}
       if(ev.stage==='F'&&win)champion=win;
     } else if(ev.stage==='3P'){
       let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac;
-      koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:'3P',g:{[hc]:ev.hs,[ac]:ev.as}});
+      {const _ms=ev.date?Date.parse(ev.date):NaN;koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:'3P',g:{[hc]:ev.hs,[ac]:ev.as},ms:Number.isFinite(_ms)?_ms:null});}
       if(win)third=win;
     }
   });

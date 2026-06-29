@@ -20,7 +20,7 @@ async function fromFootballData() {
   const out = (j.matches || []).map(m => {
     const fin = m.status === 'FINISHED';
     const ft = (m.score && m.score.fullTime) || {};
-    return { home: m.homeTeam && (m.homeTeam.name || m.homeTeam.shortName), away: m.awayTeam && (m.awayTeam.name || m.awayTeam.shortName), hs: fin && ft.home != null ? ft.home : null, as: fin && ft.away != null ? ft.away : null, stage: stageMap[m.stage] || 'GROUP', fin, status: m.status };
+    return { home: m.homeTeam && (m.homeTeam.name || m.homeTeam.shortName), away: m.awayTeam && (m.awayTeam.name || m.awayTeam.shortName), hs: fin && ft.home != null ? ft.home : null, as: fin && ft.away != null ? ft.away : null, stage: stageMap[m.stage] || 'GROUP', fin, status: m.status, date: m.utcDate || null };
   }).filter(e => e.home && e.away);
   console.log('football-data.org -> ' + out.length + ' matches (' + out.filter(e => Number.isFinite(e.hs)).length + ' finished)');
   return out;
