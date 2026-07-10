@@ -722,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=8;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=9;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -797,7 +797,7 @@ function bracketAdvancers(entry){
 function seedMapFor(e){const m={};GLETTERS.forEach(g=>{const gp=(e.groupPicks&&e.groupPicks[g])||{};m['1'+g]=gp.first||null;m['2'+g]=gp.second||null;});Object.assign(m,assignThirds(e.wildcards||[]));return m;}
 function koCodeFor(e,side,sm){if(side.seed)return sm[side.seed]||null;if(side.loser)return koLoserFor(e,side.loser,sm);return (e.bracket||{})[side.match]||null;}
 function koLoserFor(e,mid,sm){const m=KOBYID[mid];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm),w=(e.bracket||{})[mid];if(!a||!b||!w)return null;return w===a?b:a;}
-function predictedTies(e){const sm=seedMapFor(e);const ties=[];for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);const w=(e.bracket||{})[m.id];if(a&&b&&w)ties.push({pair:[a,b].sort().join('|'),winner:w});}return ties;}
+function predictedTies(e){const sm=seedMapFor(e);const ties=[];for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);const w=(e.bracket||{})[m.id];if(a&&b&&w)ties.push({pair:[a,b].sort().join('|'),winner:w,round:m.round});}return ties;}
 function scoreEntry(e){
   const S=CONFIG.scoring;let gPts=0,kPts=0;
   let mC=0,eC=0; for(const m of MATCHES){const r=state.results.matches[m.id];if(r&&e.picks&&e.picks[m.id]===r){gPts+=S.match;mC++;}const ps=e.scores&&e.scores[m.id],as=state.results.scores&&state.results.scores[m.id];if(ps&&as&&ps.h===as.h&&ps.a===as.a){gPts+=S.exactScore;eC++;}}
@@ -808,12 +808,14 @@ function scoreEntry(e){
   if(adv.champion&&state.actual.champion&&adv.champion===state.actual.champion){kPts+=S.champion;kC++;}
   const myThird=e.bracket&&(e.bracket[BRONZEID]||e.bracket['B']);if(myThird&&state.actual.third&&myThird===state.actual.third){kPts+=S.third;kC++;}
   // exact-tie bonus: a knockout match you predicted (both teams + the winner) actually happened
-  let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.pair]=am.winner;});
-  predictedTies(e).forEach(t=>{if(actM[t.pair]&&actM[t.pair]===t.winner){kPts+=S.matchupBonus;bC++;}});
-  // exact-score bonus on knockout matches too
-  let kxC=0; const actG={}; (state.actual.koMatches||[]).forEach(am=>{if(am.g)actG[am.pair]=am.g;});
+  // Bonuses must match the SAME round, not just the same pairing — otherwise a tie
+  // predicted for a later round gets credited from an earlier-round meeting of those teams.
+  let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.round+'|'+am.pair]=am.winner;});
+  predictedTies(e).forEach(t=>{const k=t.round+'|'+t.pair;if(actM[k]&&actM[k]===t.winner){kPts+=S.matchupBonus;bC++;}});
+  // exact-score bonus on knockout matches too (same round only)
+  let kxC=0; const actG={}; (state.actual.koMatches||[]).forEach(am=>{if(am.g)actG[am.round+'|'+am.pair]=am.g;});
   const smE=seedMapFor(e);
-  for(const m of KO){const a=koCodeFor(e,m.a,smE),b=koCodeFor(e,m.b,smE);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc||!Number.isFinite(sc.h)||!Number.isFinite(sc.a))continue;let h=sc.h,aa=sc.a;if(h===aa){const p=e.koPens&&e.koPens[m.id];if(p==='h')h++;else if(p==='a')aa++;else continue;}const ag=actG[[a,b].sort().join('|')];if(!ag)continue;if(ag[a]===h&&ag[b]===aa){kPts+=S.exactScore;kxC++;}}
+  for(const m of KO){const a=koCodeFor(e,m.a,smE),b=koCodeFor(e,m.b,smE);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc||!Number.isFinite(sc.h)||!Number.isFinite(sc.a))continue;let h=sc.h,aa=sc.a;if(h===aa){const p=e.koPens&&e.koPens[m.id];if(p==='h')h++;else if(p==='a')aa++;else continue;}const ag=actG[m.round+'|'+[a,b].sort().join('|')];if(!ag)continue;if(ag[a]===h&&ag[b]===aa){kPts+=S.exactScore;kxC++;}}
   return{total:gPts+kPts,groupPts:gPts,koPts:kPts,matchCorrect:mC,exactScores:eC+kxC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC,matchupHits:bC};
 }
 function maxPoints(){const S=CONFIG.scoring;return MATCHES.length*(S.match+S.exactScore)+12*(S.first+S.second)+8*S.wildcard+16*S.r16+8*S.qf+4*S.sf+2*S.finalist+S.champion+S.third+KO.length*(S.matchupBonus+S.exactScore);}
@@ -907,7 +909,7 @@ function brow(id,code,side,key,val,w,aw,editable){
 function storeKoScore(id){const hv=$('#ks-'+id+'-h'),av=$('#ks-'+id+'-a');if(!hv||!av)return;const sc={};if(hv.value!==''&&Number(hv.value)>=0)sc.h=Number(hv.value);if(av.value!==''&&Number(av.value)>=0)sc.a=Number(av.value);if(sc.h!=null||sc.a!=null)state.koScores[id]=sc;else delete state.koScores[id];if(!(sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a)))delete state.koPens[id];}
 function koMatchBox(id,sm,actM,editable){
   const m=KOBYID[id];const a=koCode(m.a,sm),b=koCode(m.b,sm);const sc=state.koScores[id]||{};const w=state.bracket[id];
-  const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
+  const aw=(a&&b)?actM[m.round+'|'+[a,b].sort().join('|')]:null;
   const box=el('div','bmatch');
   if(KODATE[id])box.appendChild(el('div','bdate',KODATE[id]));
   box.appendChild(brow(id,a,m.a,'h',sc.h,w,aw,editable));
@@ -927,7 +929,7 @@ function renderBracket(){
   const _afId=(document.activeElement&&document.activeElement.id&&document.activeElement.id.indexOf('ks-')===0)?document.activeElement.id:null;
   recomputeBracket();
   const sm=seedMap();const wrap=$('#bracket');if(!wrap)return;wrap.innerHTML='';
-  const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
+  const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.round+'|'+x.pair]=x.winner;});
   const left=MATCHES.length-Object.keys(state.scores).length;
   const seedsReady=left===0&&state.wildcards.length===8;
   const editable=seedsReady&&!isLocked();
@@ -1124,12 +1126,12 @@ function closeModal(){const m=$('#entryModal');if(m)m.classList.add('hide');}
 // round-by-round list (winner highlighted; ✓/✗ vs the real result once played).
 function entryBracketHtml(e){
   const sm=seedMapFor(e);
-  const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.pair]=x.winner;});
+  const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.round+'|'+x.pair]=x.winner;});
   const rounds=[['Round of 32',R32IDS],['Round of 16',R16IDS],['Quarter-finals',QFIDS],['Semi-finals',SFIDS],['🏆 Final',[FINID]],['🥉 3rd-place playoff',[BRONZEID]]];
   const tie=id=>{
     const m=KOBYID[id];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);
     const sc=(e.koScores&&e.koScores[id])||{};const w=(e.bracket||{})[id];
-    const aw=(a&&b)?actM[[a,b].sort().join('|')]:null;
+    const aw=(a&&b)?actM[m.round+'|'+[a,b].sort().join('|')]:null;
     const lvl=sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a);
     const side=(code,val)=>'<span class="'+(w&&w===code?'ko-win':'')+'">'+escapeHtml(code?fa(code):'?')+(val!=null?' <b>'+val+'</b>':'')+'</span>';
     const pen=lvl&&w?' <span class="muted">(pens '+fa(w)+')</span>':'';
@@ -1398,7 +1400,7 @@ function koMatchScoreFor(e,km){
   if(km.round==='3P'){const myThird=e.bracket&&(e.bracket[BRONZEID]||e.bracket.B);if(myThird&&state.actual.third&&myThird===state.actual.third)pts+=S.third;}
   // did this player predict this exact tie (both teams meeting here)?
   let predG=null,predWinner=null,predPair=false;
-  for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);if(!a||!b)continue;if([a,b].sort().join('|')===km.pair){predPair=true;predWinner=(e.bracket&&e.bracket[m.id])||null;const sc=e.koScores&&e.koScores[m.id];if(sc&&Number.isFinite(sc.h)&&Number.isFinite(sc.a))predG={[a]:sc.h,[b]:sc.a};break;}}
+  for(const m of KO){if(m.round!==km.round)continue;const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);if(!a||!b)continue;if([a,b].sort().join('|')===km.pair){predPair=true;predWinner=(e.bracket&&e.bracket[m.id])||null;const sc=e.koScores&&e.koScores[m.id];if(sc&&Number.isFinite(sc.h)&&Number.isFinite(sc.a))predG={[a]:sc.h,[b]:sc.a};break;}}
   let exact=false,tieWin=false;
   if(predPair){
     if(predWinner&&km.winner&&predWinner===km.winner){pts+=S.matchupBonus;tieWin=true;}
