@@ -722,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=9;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=10;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1602,6 +1602,11 @@ function ingest(events){
       if(!ko[ev.stage].includes(hc))ko[ev.stage].push(hc);
       if(!ko[ev.stage].includes(ac))ko[ev.stage].push(ac);
       let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac;
+      // A round's winner has reached the NEXT round — record it even before that
+      // round's fixture is published (the feed leaves later slots as TBD), so
+      // "reached the semis/final" scores as soon as the earlier tie is decided.
+      const NEXT={R16:'QF',QF:'SF',SF:'F'}[ev.stage];
+      if(win&&NEXT&&!ko[NEXT].includes(win))ko[NEXT].push(win);
       {const _ms=ev.date?Date.parse(ev.date):NaN;koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:ev.stage,g:{[hc]:ev.hs,[ac]:ev.as},ms:Number.isFinite(_ms)?_ms:null});}
       if(ev.stage==='F'&&win)champion=win;
     } else if(ev.stage==='3P'){
