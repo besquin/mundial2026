@@ -65,7 +65,7 @@ function tableFromScores(scores){ const t={}; GLETTERS.forEach(g=>{
     if(sc.h>sc.a)H.pts+=3;else if(sc.a>sc.h)A.pts+=3;else{H.pts++;A.pts++;}});
   rows.forEach(r=>r.gd=r.gf-r.ga); rows.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.idx-b.idx); t[g]=rows; }); return t; }
 
-function ingestActual(events){
+function ingestActual(events,propagateNext){
   events=Array.isArray(events)?events:(events&&typeof events==='object'?Object.values(events):[]);
   {const _m={};events.forEach(e=>{if(!e||!e.home)return;const hc=codeOf(e.home),ac=codeOf(e.away);const k=(hc&&ac)?[hc,ac].sort().join('|'):(e.home+'|'+e.away);const old=_m[k];const sc=Number.isFinite(e.hs)&&Number.isFinite(e.as);const os=old&&Number.isFinite(old.hs)&&Number.isFinite(old.as);if(!old||(sc&&!os))_m[k]=e;});events=Object.values(_m);}
   const matches={},scores={},tbl={};GLETTERS.forEach(g=>{tbl[g]={};GROUPS[g].forEach(t=>tbl[g][t[0]]={code:t[0],p:0,w:0,d:0,gf:0,ga:0});});
@@ -78,7 +78,7 @@ function ingestActual(events){
       koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:'R32',g:{[hc]:ev.hs,[ac]:ev.as}});
     } else if(['R16','QF','SF','F'].includes(ev.stage)){ if(!ko[ev.stage].includes(hc))ko[ev.stage].push(hc); if(!ko[ev.stage].includes(ac))ko[ev.stage].push(ac);
       let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac;
-      const NEXT={R16:'QF',QF:'SF',SF:'F'}[ev.stage]; if(win&&NEXT&&!ko[NEXT].includes(win))ko[NEXT].push(win);
+      const NEXT={R16:'QF',QF:'SF',SF:'F'}[ev.stage]; if(propagateNext&&win&&NEXT&&!ko[NEXT].includes(win))ko[NEXT].push(win);
       koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:ev.stage,g:{[hc]:ev.hs,[ac]:ev.as}}); if(ev.stage==='F'&&win)champion=win;
     } else if(ev.stage==='3P'){ let win=null;if(Number.isFinite(ev.hs)&&Number.isFinite(ev.as)&&ev.hs!==ev.as)win=ev.hs>ev.as?hc:ac; koMatches.push({pair:[hc,ac].sort().join('|'),winner:win,round:'3P',g:{[hc]:ev.hs,[ac]:ev.as}}); if(win)third=win; }
   });
@@ -95,7 +95,7 @@ function koCodeFor(e,side,sm){if(side.seed)return sm[side.seed]||null;if(side.lo
 function koLoserFor(e,mid,sm){const m=KOBYID[mid];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm),w=(e.bracket||{})[mid];if(!a||!b||!w)return null;return w===a?b:a;}
 function bracketAdvancers(entry){const w=entry.bracket||{};const win=ids=>ids.map(id=>w[id]).filter(Boolean);return{R16:win(R32IDS),QF:win(R16IDS),SF:win(QFIDS),F:win(SFIDS),champion:w[FINID]||null};}
 function predictedTies(e){const sm=seedMapFor(e);const ties=[];for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);const w=(e.bracket||{})[m.id];if(a&&b&&w)ties.push({pair:[a,b].sort().join('|'),winner:w,round:m.round});}return ties;}
-function scoreEntry(e){ const S=CONFIG.scoring;let gPts=0,kPts=0;
+function scoreEntry(e,roundAware){ const S=CONFIG.scoring;let gPts=0,kPts=0; const K=(r,p)=>roundAware?(r+'|'+p):p;
   let mC=0,eC=0; for(const m of MATCHES){const r=state.results.matches[m.id];if(r&&e.picks&&e.picks[m.id]===r){gPts+=S.match;mC++;}const ps=e.scores&&e.scores[m.id],as=state.results.scores&&state.results.scores[m.id];if(ps&&as&&ps.h===as.h&&ps.a===as.a){gPts+=S.exactScore;eC++;}}
   let gC=0; GLETTERS.forEach(g=>{const act=state.actual.groups[g];const gp=e.groupPicks&&e.groupPicks[g];if(act&&gp){if(gp.first&&gp.first===act.first){gPts+=S.first;gC++;}if(gp.second&&gp.second===act.second){gPts+=S.second;gC++;}}});
   let wC=0; (e.wildcards||[]).forEach(c=>{if((state.actual.wildcards||[]).includes(c)){gPts+=S.wildcard;wC++;}});
@@ -103,44 +103,57 @@ function scoreEntry(e){ const S=CONFIG.scoring;let gPts=0,kPts=0;
   [['R16',S.r16],['QF',S.qf],['SF',S.sf],['F',S.finalist]].forEach(([rd,p])=>{const set=state.actual.ko[rd]||[];(adv[rd]||[]).forEach(c=>{if(set.includes(c)){kPts+=p;kC++;}});});
   if(adv.champion&&state.actual.champion&&adv.champion===state.actual.champion){kPts+=S.champion;kC++;}
   const myThird=e.bracket&&(e.bracket[BRONZEID]||e.bracket['B']);if(myThird&&state.actual.third&&myThird===state.actual.third){kPts+=S.third;kC++;}
-  let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[am.round+'|'+am.pair]=am.winner;});
-  predictedTies(e).forEach(t=>{const k=t.round+'|'+t.pair;if(actM[k]&&actM[k]===t.winner){kPts+=S.matchupBonus;bC++;}});
-  let kxC=0; const actG={}; (state.actual.koMatches||[]).forEach(am=>{if(am.g)actG[am.round+'|'+am.pair]=am.g;});
+  let bC=0; const actM={}; (state.actual.koMatches||[]).forEach(am=>{if(am.winner)actM[K(am.round,am.pair)]=am.winner;});
+  predictedTies(e).forEach(t=>{const k=K(t.round,t.pair);if(actM[k]&&actM[k]===t.winner){kPts+=S.matchupBonus;bC++;}});
+  let kxC=0; const actG={}; (state.actual.koMatches||[]).forEach(am=>{if(am.g)actG[K(am.round,am.pair)]=am.g;});
   const smE=seedMapFor(e);
-  for(const m of KO){const a=koCodeFor(e,m.a,smE),b=koCodeFor(e,m.b,smE);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc||!Number.isFinite(sc.h)||!Number.isFinite(sc.a))continue;let h=sc.h,aa=sc.a;if(h===aa){const p=e.koPens&&e.koPens[m.id];if(p==='h')h++;else if(p==='a')aa++;else continue;}const ag=actG[m.round+'|'+[a,b].sort().join('|')];if(!ag)continue;if(ag[a]===h&&ag[b]===aa){kPts+=S.exactScore;kxC++;}}
+  for(const m of KO){const a=koCodeFor(e,m.a,smE),b=koCodeFor(e,m.b,smE);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc||!Number.isFinite(sc.h)||!Number.isFinite(sc.a))continue;let h=sc.h,aa=sc.a;if(h===aa){const p=e.koPens&&e.koPens[m.id];if(p==='h')h++;else if(p==='a')aa++;else continue;}const ag=actG[K(m.round,[a,b].sort().join('|'))];if(!ag)continue;if(ag[a]===h&&ag[b]===aa){kPts+=S.exactScore;kxC++;}}
   return{total:gPts+kPts,groupPts:gPts,koPts:kPts,matchCorrect:mC,exactScores:eC+kxC,groupCorrect:gC,wcCorrect:wC,koCorrect:kC,matchupHits:bC};
+}
+
+function loadState(events, propagateNext){
+  const A = ingestActual(events, propagateNext);
+  state.results.matches = A.matches; state.results.scores = A.scores;
+  state.actual = { groups:A.groups, wildcards:A.wildcards, ko:A.ko, koMatches:A.koMatches, champion:A.champion, third:A.third };
+  return A;
 }
 
 (async () => {
   const res = await get('/pools/_results');
-  const A = ingestActual(res && res.events);
-  state.results.matches = A.matches; state.results.scores = A.scores;
-  state.actual = { groups:A.groups, wildcards:A.wildcards, ko:A.ko, koMatches:A.koMatches, champion:A.champion, third:A.third };
-  console.log('ACTUAL — group matches scored:', Object.keys(A.matches).length, '| reached R16:', A.ko.R16.length, 'QF:', A.ko.QF.length, 'SF:', A.ko.SF.length, 'F:', A.ko.F.length, '| champ:', A.champion, 'third:', A.third);
-  console.log('  SF teams:', A.ko.SF.join(',') || '(none)');
-
+  const events = res && res.events;
   const entries = (await get('/entries')) || {};
   const ids = Object.keys(entries);
-  console.log('\nENTRIES:', ids.length);
-  const rows = ids.map(id => ({ id, e: entries[id], name: (entries[id]||{}).name || 'Anon', s: scoreEntry(entries[id]||{}) }));
-  rows.sort((a,b)=>b.s.total-a.s.total);
-  console.log('\n=== LEADERBOARD (recomputed) ===');
-  rows.forEach((r,i)=>{
-    const e=r.e; const flags=[];
-    ['groupPicks','wildcards','bracket','koScores'].forEach(k=>{ if(!e[k] || (Array.isArray(e[k])?!e[k].length:!Object.keys(e[k]).length)) flags.push('no-'+k); });
-    console.log(`  #${i+1} ${r.name.padEnd(20)} total=${r.s.total}  grp=${r.s.groupPts} ko=${r.s.koPts}  (adv=${r.s.koCorrect} matchup=${r.s.matchupHits} exact=${r.s.exactScores})${flags.length?'  ⚠ '+flags.join(','):''}`);
+
+  // NEW (deployed) logic: winner propagation + round-aware bonuses
+  const A = loadState(events, true);
+  console.log('ACTUAL — group scored:', Object.keys(A.matches).length, '| SF teams:', A.ko.SF.join(',')||'(none)', '| F:', A.ko.F.join(',')||'(none)', 'champ:', A.champion);
+  const NEW = {}; ids.forEach(id => NEW[id] = scoreEntry(entries[id], true).total);
+
+  // OLD logic (what players saw before today's two fixes): no SF/F winner
+  // propagation, and bonuses matched by pairing only (ignoring round).
+  loadState(events, false);
+  const OLD = {}; ids.forEach(id => OLD[id] = scoreEntry(entries[id], false).total);
+
+  // reload NEW for detail section
+  loadState(events, true);
+  const rank = obj => { const s=ids.slice().sort((a,b)=>obj[b]-obj[a]); const r={}; s.forEach((id,i)=>r[id]=i+1); return r; };
+  const oldRank = rank(OLD), newRank = rank(NEW);
+  const rows = ids.map(id => ({ id, name:(entries[id]||{}).name||'Anon', old:OLD[id], neu:NEW[id], or:oldRank[id], nr:newRank[id] }));
+  rows.sort((a,b)=>a.nr-b.nr);
+  console.log('\n=== BEFORE (pre-fix) vs AFTER (fixed) ===');
+  console.log('  rank  player                 before -> after   Δpts   rankΔ');
+  rows.forEach(r=>{
+    const dp=(r.neu-r.old>=0?'+':'')+(r.neu-r.old);
+    const dr=r.or===r.nr?'—':(r.nr<r.or?('▲'+(r.or-r.nr)):('▼'+(r.nr-r.or)));
+    console.log(`  #${String(r.nr).padEnd(4)} ${r.name.padEnd(20)} ${String(r.old).padStart(4)} -> ${String(r.neu).padStart(4)}   ${dp.padStart(4)}   was#${r.or} ${dr}`);
   });
 
-  // detail for two named players
-  const want = ['jerry','capi','keller'];
+  const want = ['capi','keller'];
   rows.filter(r=>want.some(w=>r.name.toLowerCase().includes(w))).forEach(r=>{
-    const e=r.e; console.log(`\n=== DETAIL: ${r.name} ===`);
-    const adv=bracketAdvancers(e);
-    console.log('  predicted advancers R16:', adv.R16.join(','));
-    console.log('  predicted advancers QF :', adv.QF.join(','));
-    console.log('  predicted advancers SF :', adv.SF.join(','), '  (each in actual SF scores +'+CONFIG.scoring.sf+')');
-    console.log('  predicted finalists F  :', adv.F.join(','), '  champion:', adv.champion);
-    console.log('  → SF hits:', adv.SF.filter(c=>state.actual.ko.SF.includes(c)).join(',')||'(none)');
-    console.log('  predicted ties:', predictedTies(e).map(t=>t.round+':'+t.pair.replace('|','v')+'→'+t.winner).join('  '));
+    const e=entries[r.id]; const adv=bracketAdvancers(e);
+    console.log(`\n=== DETAIL: ${r.name} — predicted semifinalists: ${adv.SF.join(',')} → actual SF hits: ${adv.SF.filter(c=>A.ko.SF.includes(c)).join(',')||'(none)'} ===`);
   });
+  // who gained the most from the SF fix (predicted both actual semifinalists)
+  console.log('\nActual semifinalists so far:', A.ko.SF.join(','));
+  rows.forEach(r=>{ const adv=bracketAdvancers(entries[r.id]); const hits=adv.SF.filter(c=>A.ko.SF.includes(c)); if(hits.length) console.log('  '+r.name.padEnd(20)+' correctly had in SF: '+hits.join(',')+'  (+'+(hits.length*CONFIG.scoring.sf)+')'); });
 })().catch(e => { console.error(e); process.exit(1); });
