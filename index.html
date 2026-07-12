@@ -722,7 +722,7 @@ const state={
 GLETTERS.forEach(g=>{state.groupPicks[g]={first:null,second:null};});
 
 /* =========================== STORE (entries) =========================== */
-const APPVER=10;   // bump on each deploy; open tabs auto-reload when a newer version ships
+const APPVER=11;   // bump on each deploy; open tabs auto-reload when a newer version ships
 const Store=(()=>{
   const FB=!!(CONFIG.firebase&&CONFIG.firebase.databaseURL);
   const JB='https://jsonblob.com/api/jsonBlob';
@@ -1127,16 +1127,21 @@ function closeModal(){const m=$('#entryModal');if(m)m.classList.add('hide');}
 function entryBracketHtml(e){
   const sm=seedMapFor(e);
   const actM={};(state.actual.koMatches||[]).forEach(x=>{if(x.winner)actM[x.round+'|'+x.pair]=x.winner;});
+  // Per round, which teams actually won (advanced) vs lost their real tie. The ✓/✗
+  // reflects whether the picked WINNER advanced — independent of the opponent — since
+  // that's what scores; a 🎯 also flags nailing the exact pairing (matchup bonus).
+  const res={};(state.actual.koMatches||[]).forEach(x=>{if(!x.winner)return;const[p,q]=x.pair.split('|');(res[x.round]=res[x.round]||{})[p]=(p===x.winner?'win':'loss');res[x.round][q]=(q===x.winner?'win':'loss');});
   const rounds=[['Round of 32',R32IDS],['Round of 16',R16IDS],['Quarter-finals',QFIDS],['Semi-finals',SFIDS],['🏆 Final',[FINID]],['🥉 3rd-place playoff',[BRONZEID]]];
   const tie=id=>{
     const m=KOBYID[id];const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);
     const sc=(e.koScores&&e.koScores[id])||{};const w=(e.bracket||{})[id];
-    const aw=(a&&b)?actM[m.round+'|'+[a,b].sort().join('|')]:null;
+    const exact=(a&&b&&w&&actM[m.round+'|'+[a,b].sort().join('|')]===w);   // exact tie nailed (bonus)
+    const adv=w?(res[m.round]&&res[m.round][w]):null;                       // did the picked winner advance?
     const lvl=sc.h!=null&&sc.a!=null&&Number(sc.h)===Number(sc.a);
     const side=(code,val)=>'<span class="'+(w&&w===code?'ko-win':'')+'">'+escapeHtml(code?fa(code):'?')+(val!=null?' <b>'+val+'</b>':'')+'</span>';
     const pen=lvl&&w?' <span class="muted">(pens '+fa(w)+')</span>':'';
-    const mark=aw?(w&&aw===w?' ✓':' ✗'):'';
-    const cls=aw?(w&&aw===w?'ok':'miss'):'';
+    const mark=adv==='win'?(' ✓'+(exact?' 🎯':'')):(adv==='loss'?' ✗':'');
+    const cls=adv==='win'?'ok':(adv==='loss'?'miss':'');
     return '<div class="korow '+cls+'">'+side(a,sc.h)+' <span class="muted">v</span> '+side(b,sc.a)+pen+mark+'</div>';
   };
   return rounds.map(([lbl,ids])=>'<div class="koround"><div class="korlbl">'+lbl+'</div>'+ids.map(tie).join('')+'</div>').join('');
