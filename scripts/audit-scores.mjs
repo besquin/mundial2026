@@ -118,42 +118,55 @@ function loadState(events, propagateNext){
   return A;
 }
 
+// Independent itemized breakdown — recomputes each scoring component with its own
+// loop, so summing the parts is a cross-check on scoreEntry's total.
+function breakdown(e){
+  const S=CONFIG.scoring,A=state.actual,R=state.results;
+  let grpM=0,grpE=0; for(const m of MATCHES){ if(R.matches[m.id]&&e.picks&&e.picks[m.id]===R.matches[m.id])grpM+=S.match; const ps=e.scores&&e.scores[m.id],as=R.scores[m.id]; if(ps&&as&&ps.h===as.h&&ps.a===as.a)grpE+=S.exactScore; }
+  let g1=0,g2=0; GLETTERS.forEach(g=>{const act=A.groups[g],gp=e.groupPicks&&e.groupPicks[g]; if(act&&gp){ if(gp.first&&gp.first===act.first)g1+=S.first; if(gp.second&&gp.second===act.second)g2+=S.second; }});
+  let wild=0; (e.wildcards||[]).forEach(c=>{ if((A.wildcards||[]).includes(c))wild+=S.wildcard; });
+  const adv=bracketAdvancers(e),ap={};
+  [['R16',S.r16],['QF',S.qf],['SF',S.sf],['F',S.finalist]].forEach(([rd,p])=>{ let s=0; (adv[rd]||[]).forEach(c=>{ if((A.ko[rd]||[]).includes(c))s+=p; }); ap[rd]=s; });
+  const champ=(adv.champion&&A.champion&&adv.champion===A.champion)?S.champion:0;
+  const myThird=e.bracket&&(e.bracket[BRONZEID]||e.bracket.B); const third=(myThird&&A.third&&myThird===A.third)?S.third:0;
+  const actM={}; (A.koMatches||[]).forEach(am=>{if(am.winner)actM[am.round+'|'+am.pair]=am.winner;});
+  let matchup=0; predictedTies(e).forEach(t=>{ if(actM[t.round+'|'+t.pair]===t.winner)matchup+=S.matchupBonus; });
+  const actG={}; (A.koMatches||[]).forEach(am=>{if(am.g)actG[am.round+'|'+am.pair]=am.g;});
+  let exKO=0; const sm=seedMapFor(e);
+  for(const m of KO){const a=koCodeFor(e,m.a,sm),b=koCodeFor(e,m.b,sm);const sc=e.koScores&&e.koScores[m.id];if(!a||!b||!sc||!Number.isFinite(sc.h)||!Number.isFinite(sc.a))continue;let h=sc.h,aa=sc.a;if(h===aa){const p=e.koPens&&e.koPens[m.id];if(p==='h')h++;else if(p==='a')aa++;else continue;}const ag=actG[m.round+'|'+[a,b].sort().join('|')];if(!ag)continue;if(ag[a]===h&&ag[b]===aa)exKO+=S.exactScore;}
+  const total=grpM+grpE+g1+g2+wild+ap.R16+ap.QF+ap.SF+ap.F+champ+third+matchup+exKO;
+  return {grpM,grpE,g1,g2,wild,R16:ap.R16,QF:ap.QF,SF:ap.SF,F:ap.F,champ,third,matchup,exKO,total};
+}
+
 (async () => {
   const res = await get('/pools/_results');
   const events = res && res.events;
   const entries = (await get('/entries')) || {};
   const ids = Object.keys(entries);
-
-  // NEW (deployed) logic: winner propagation + round-aware bonuses
   const A = loadState(events, true);
-  console.log('ACTUAL — group scored:', Object.keys(A.matches).length, '| SF teams:', A.ko.SF.join(',')||'(none)', '| F:', A.ko.F.join(',')||'(none)', 'champ:', A.champion);
-  const NEW = {}; ids.forEach(id => NEW[id] = scoreEntry(entries[id], true).total);
 
-  // OLD logic (what players saw before today's two fixes): no SF/F winner
-  // propagation, and bonuses matched by pairing only (ignoring round).
-  loadState(events, false);
-  const OLD = {}; ids.forEach(id => OLD[id] = scoreEntry(entries[id], false).total);
+  // 1) VERIFY the actual derived results against reality (eyeball these).
+  console.log('=== ACTUAL RESULTS DERIVED FROM FEED ===');
+  console.log('Group matches scored:', Object.keys(A.matches).length, '/ 72');
+  console.log('Group winners/runners-up:');
+  GLETTERS.forEach(g=>console.log('  '+g+': 1st '+(A.groups[g]?A.groups[g].first:'—')+'  2nd '+(A.groups[g]?A.groups[g].second:'—')));
+  console.log('Wild cards (8 best 3rd):', A.wildcards.join(',')||'(none)');
+  console.log('Reached R16('+A.ko.R16.length+'):', A.ko.R16.join(','));
+  console.log('Reached QF('+A.ko.QF.length+'): ', A.ko.QF.join(','));
+  console.log('Reached SF('+A.ko.SF.length+'): ', A.ko.SF.join(','));
+  console.log('Finalists('+A.ko.F.length+'):   ', A.ko.F.join(',')||'(none)', '| champ:', A.champion||'—', '| 3rd:', A.third||'—');
+  console.log('\nActual knockout results (round | teams | winner):');
+  (A.koMatches||[]).slice().sort((x,y)=>x.round.localeCompare(y.round)).forEach(m=>{const[x,y]=m.pair.split('|');console.log('  '+m.round.padEnd(4)+' '+x+' '+(m.g[x]??'-')+'-'+(m.g[y]??'-')+' '+y+'  → '+(m.winner||'(tbd)'));});
 
-  // reload NEW for detail section
-  loadState(events, true);
-  const rank = obj => { const s=ids.slice().sort((a,b)=>obj[b]-obj[a]); const r={}; s.forEach((id,i)=>r[id]=i+1); return r; };
-  const oldRank = rank(OLD), newRank = rank(NEW);
-  const rows = ids.map(id => ({ id, name:(entries[id]||{}).name||'Anon', old:OLD[id], neu:NEW[id], or:oldRank[id], nr:newRank[id] }));
-  rows.sort((a,b)=>a.nr-b.nr);
-  console.log('\n=== BEFORE (pre-fix) vs AFTER (fixed) ===');
-  console.log('  rank  player                 before -> after   Δpts   rankΔ');
-  rows.forEach(r=>{
-    const dp=(r.neu-r.old>=0?'+':'')+(r.neu-r.old);
-    const dr=r.or===r.nr?'—':(r.nr<r.or?('▲'+(r.or-r.nr)):('▼'+(r.nr-r.or)));
-    console.log(`  #${String(r.nr).padEnd(4)} ${r.name.padEnd(20)} ${String(r.old).padStart(4)} -> ${String(r.neu).padStart(4)}   ${dp.padStart(4)}   was#${r.or} ${dr}`);
+  // 2) ITEMIZED per-player breakdown + internal consistency check.
+  const rows = ids.map(id=>({id,name:(entries[id]||{}).name||'Anon',b:breakdown(entries[id]),full:scoreEntry(entries[id],true)}));
+  rows.sort((a,b)=>b.b.total-a.b.total);
+  console.log('\n=== ITEMIZED POINTS (grpW+grpExact | 1st 2nd wild | R16 QF SF F | champ 3rd | matchup exactKO = total) ===');
+  let allOk=true;
+  rows.forEach((r,i)=>{
+    const b=r.b; const chk=b.total===r.full.total?'OK':('❌ MISMATCH scoreEntry='+r.full.total);
+    if(b.total!==r.full.total)allOk=false;
+    console.log(`#${i+1} ${r.name.padEnd(18)} ${String(b.grpM).padStart(2)}+${String(b.grpE).padStart(2)} | ${b.g1} ${b.g2} ${String(b.wild).padStart(2)} | ${String(b.R16).padStart(2)} ${String(b.QF).padStart(2)} ${String(b.SF).padStart(2)} ${b.F} | ${b.champ} ${b.third} | ${b.matchup} ${b.exKO} = ${String(b.total).padStart(3)}  [${chk}]`);
   });
-
-  const want = ['capi','keller'];
-  rows.filter(r=>want.some(w=>r.name.toLowerCase().includes(w))).forEach(r=>{
-    const e=entries[r.id]; const adv=bracketAdvancers(e);
-    console.log(`\n=== DETAIL: ${r.name} — predicted semifinalists: ${adv.SF.join(',')} → actual SF hits: ${adv.SF.filter(c=>A.ko.SF.includes(c)).join(',')||'(none)'} ===`);
-  });
-  // who gained the most from the SF fix (predicted both actual semifinalists)
-  console.log('\nActual semifinalists so far:', A.ko.SF.join(','));
-  rows.forEach(r=>{ const adv=bracketAdvancers(entries[r.id]); const hits=adv.SF.filter(c=>A.ko.SF.includes(c)); if(hits.length) console.log('  '+r.name.padEnd(20)+' correctly had in SF: '+hits.join(',')+'  (+'+(hits.length*CONFIG.scoring.sf)+')'); });
+  console.log('\nInternal consistency (sum of components == scoreEntry total for every player):', allOk?'PASS ✅':'FAIL ❌');
 })().catch(e => { console.error(e); process.exit(1); });
