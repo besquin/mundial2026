@@ -138,6 +138,9 @@ function breakdown(e){
   return {grpM,grpE,g1,g2,wild,R16:ap.R16,QF:ap.QF,SF:ap.SF,F:ap.F,champ,third,matchup,exKO,total};
 }
 
+// Previous snapshot (2026-07-15, after the Spain–France semifinal) for day-over-day delta.
+const BASELINE = { 'Jerry':207, 'Fred Mayweather':187, 'El Capi Keller':174, 'Besquin 🏆':171, 'Jaime Duende':161, 'Rebo Golf':160, 'Omi':145, 'KNO':131 };
+
 (async () => {
   const res = await get('/pools/_results');
   const events = res && res.events;
@@ -169,4 +172,9 @@ function breakdown(e){
     console.log(`#${i+1} ${r.name.padEnd(18)} ${String(b.grpM).padStart(2)}+${String(b.grpE).padStart(2)} | ${b.g1} ${b.g2} ${String(b.wild).padStart(2)} | ${String(b.R16).padStart(2)} ${String(b.QF).padStart(2)} ${String(b.SF).padStart(2)} ${b.F} | ${b.champ} ${b.third} | ${b.matchup} ${b.exKO} = ${String(b.total).padStart(3)}  [${chk}]`);
   });
   console.log('\nInternal consistency (sum of components == scoreEntry total for every player):', allOk?'PASS ✅':'FAIL ❌');
+
+  // Day-over-day delta vs the previous reported snapshot.
+  console.log('\n=== DELTA vs previous (BASELINE 2026-07-15) ===');
+  console.log('Finalists known: '+A.ko.F.length+'/2  (both known = 2nd semifinal decided)  Finalists: '+(A.ko.F.join(',')||'(none)')+'  champ: '+(A.champion||'—')+'  3rd: '+(A.third||'—'));
+  rows.forEach((r,i)=>{ const base=BASELINE[r.name]; const d=base==null?'(new)':((r.b.total-base>=0?'+':'')+(r.b.total-base)); console.log(`#${i+1} ${r.name.padEnd(18)} ${String(base==null?'—':base).padStart(4)} -> ${String(r.b.total).padStart(4)}   ${String(d).padStart(5)}`); });
 })().catch(e => { console.error(e); process.exit(1); });
