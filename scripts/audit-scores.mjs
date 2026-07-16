@@ -177,4 +177,46 @@ const BASELINE = { 'Jerry':207, 'Fred Mayweather':187, 'El Capi Keller':174, 'Be
   console.log('\n=== DELTA vs previous (BASELINE 2026-07-15) ===');
   console.log('Finalists known: '+A.ko.F.length+'/2  (both known = 2nd semifinal decided)  Finalists: '+(A.ko.F.join(',')||'(none)')+'  champ: '+(A.champion||'—')+'  3rd: '+(A.third||'—'));
   rows.forEach((r,i)=>{ const base=BASELINE[r.name]; const d=base==null?'(new)':((r.b.total-base>=0?'+':'')+(r.b.total-base)); console.log(`#${i+1} ${r.name.padEnd(18)} ${String(base==null?'—':base).padStart(4)} -> ${String(r.b.total).padStart(4)}   ${String(d).padStart(5)}`); });
+
+  // ===== REMAINING-GAMES SCENARIO ANALYSIS =====
+  // Only the Final (M104) and 3rd-place (M103) are left. Compute each player's
+  // remaining points under every outcome (champion ∈ finalists, 3rd ∈ SF losers).
+  const S=CONFIG.scoring;
+  const finalists=A.ko.F.slice();                 // [ESP, ARG]
+  const sfLosers=(()=>{const w=new Set(A.ko.F);return A.ko.SF.filter(t=>!w.has(t));})(); // [FRA, ENG]
+  console.log('\n=== REMAINING GAMES ===');
+  console.log('Final:', finalists.join(' vs ')||'?', '| 3rd-place:', sfLosers.join(' vs ')||'?');
+  const info=e=>{const sm=seedMapFor(e);
+    const fA=koCodeFor(e,KOBYID[FINID].a,sm),fB=koCodeFor(e,KOBYID[FINID].b,sm);
+    const bA=koCodeFor(e,KOBYID[BRONZEID].a,sm),bB=koCodeFor(e,KOBYID[BRONZEID].b,sm);
+    return {champ:(e.bracket||{})[FINID]||null,finalPair:[fA,fB].filter(Boolean).sort().join('|'),fScore:(e.koScores&&e.koScores[FINID])||null,
+            third:(e.bracket||{})[BRONZEID]||null,bronzePair:[bA,bB].filter(Boolean).sort().join('|'),bScore:(e.koScores&&e.koScores[BRONZEID])||null};};
+  const finalKey=finalists.slice().sort().join('|'), bronzeKey=sfLosers.slice().sort().join('|');
+  // best-case remaining points for a player given champion=C, third=T (assumes exact
+  // scorelines land in their favour — the true ceiling).
+  const gain=(e,C,T)=>{const x=info(e);let g=0;
+    if(x.champ===C)g+=S.champion;
+    if(x.finalPair===finalKey&&x.champ===C){g+=S.matchupBonus;if(x.fScore&&Number.isFinite(x.fScore.h)&&Number.isFinite(x.fScore.a))g+=S.exactScore;}
+    if(x.third===T)g+=S.third;
+    if(x.bronzePair===bronzeKey&&x.third===T){g+=S.matchupBonus;if(x.bScore&&Number.isFinite(x.bScore.h)&&Number.isFinite(x.bScore.a))g+=S.exactScore;}
+    return g;};
+  console.log('\nPlayer picks (champion | predicted final | 3rd pick):');
+  rows.forEach(r=>{const x=info(entries[r.id]);console.log('  '+r.name.padEnd(18)+' champ='+(x.champ||'—').padEnd(4)+' final='+(x.finalPair||'—').padEnd(9)+(x.fScore?(' '+x.fScore.h+'-'+x.fScore.a):'')+'  3rd='+(x.third||'—'));});
+  const cur={}; rows.forEach(r=>cur[r.name]=r.b.total);
+  const jerry='Jerry';
+  console.log('\nProjected FINAL totals per scenario (champion / 3rd-place winner):');
+  for(const C of finalists) for(const T of sfLosers){
+    const proj=rows.map(r=>({name:r.name,tot:cur[r.name]+gain(entries[r.id],C,T)})).sort((a,b)=>b.tot-a.tot);
+    console.log('  ['+C+' champ, '+T+' 3rd]: '+proj.slice(0,4).map(p=>p.name.split(' ')[0]+' '+p.tot).join('  |  '));
+  }
+  console.log('\nCan Jerry be caught? (chaser BEST case vs Jerry determined-min, per scenario):');
+  const jg=(C,T)=>{const x=info(entries[rows.find(r=>r.name===jerry).id]);let g=0;if(x.champ===C)g+=S.champion;if(x.finalPair===finalKey&&x.champ===C)g+=S.matchupBonus;if(x.third===T)g+=S.third;if(x.bronzePair===bronzeKey&&x.third===T)g+=S.matchupBonus;return g;};
+  let anyCatch=false;
+  rows.filter(r=>r.name!==jerry).forEach(r=>{
+    let best=-99,bestScn='';
+    for(const C of finalists) for(const T of sfLosers){const my=cur[r.name]+gain(entries[r.id],C,T);const jr=cur[jerry]+jg(C,T);if(my-jr>best){best=my-jr;bestScn='['+C+'/'+T+']';}}
+    if(best>0)anyCatch=true;
+    console.log('  '+r.name.padEnd(18)+' best margin vs Jerry: '+(best>0?'+':'')+best+'  '+bestScn+(best>0?'  ← CAN WIN':'  (cannot catch)'));
+  });
+  console.log('\n=> '+(anyCatch?'Jerry CAN still be caught.':'Jerry is MATHEMATICALLY GUARANTEED 1st.'));
 })().catch(e => { console.error(e); process.exit(1); });
