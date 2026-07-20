@@ -138,8 +138,8 @@ function breakdown(e){
   return {grpM,grpE,g1,g2,wild,R16:ap.R16,QF:ap.QF,SF:ap.SF,F:ap.F,champ,third,matchup,exKO,total};
 }
 
-// Previous snapshot (2026-07-15, after the Spain–France semifinal) for day-over-day delta.
-const BASELINE = { 'Jerry':207, 'Fred Mayweather':187, 'El Capi Keller':174, 'Besquin 🏆':171, 'Jaime Duende':161, 'Rebo Golf':160, 'Omi':145, 'KNO':131 };
+// Previous snapshot (2026-07-16, after both semifinals — before the Final & 3rd-place) for delta.
+const BASELINE = { 'Jerry':207, 'Fred Mayweather':187, 'Besquin 🏆':183, 'El Capi Keller':174, 'Jaime Duende':173, 'Rebo Golf':160, 'Omi':145, 'KNO':131 };
 
 (async () => {
   const res = await get('/pools/_results');
